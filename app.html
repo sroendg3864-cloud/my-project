@@ -233,6 +233,21 @@
   .seg-btn + .seg-btn{ border-left:1px solid var(--border); }
   .seg-btn:hover{ background:var(--surface-2); }
   .seg-btn.active{ background:var(--accent); color:#fff; font-weight:600; }
+  .map-zoom{ display:flex; align-items:center; gap:4px; margin-left:auto; }
+  .zoom-btn{
+    font-family:inherit; font-size:14px; line-height:1; cursor:pointer;
+    width:24px; height:24px; border-radius:6px; color:var(--ink-dim);
+    border:1px solid var(--border); background:var(--surface);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .zoom-btn:hover{ background:var(--surface-2); color:var(--ink); }
+  .zoom-label{ font-size:11px; color:var(--ink-faint); min-width:30px; text-align:center; }
+  .map-hint{ font-size:11px; color:var(--ink-faint); }
+  /* 지도 위에서는 브라우저 기본 핀치줌/제스처 대신 우리 핸들러가 동작하게 한다 */
+  .map-frame svg{ touch-action:none; cursor:grab; }
+  .map-frame svg.zoomed{ cursor:grab; }
+  .map-frame svg:active{ cursor:grabbing; }
+
   .province{ transition:fill .18s ease; }
   .province:hover{ stroke:var(--accent); stroke-width:1.6; cursor:pointer; }
   .province.selected{ stroke:var(--accent-strong); stroke-width:2.4; }
@@ -272,7 +287,8 @@
     padding:8px; box-shadow:var(--shadow);
   }
   .map-frame svg{ width:100%; height:auto; display:block; }
-  .province{ fill:var(--surface-2); stroke:var(--border); stroke-width:1; }
+  /* non-scaling-stroke: 확대해도 시도 경계선이 두꺼워지지 않는다 */
+  .province{ fill:var(--surface-2); stroke:var(--border); stroke-width:1; vector-effect:non-scaling-stroke; }
   .pin{ cursor:pointer; }
   .pin circle.core{ stroke:var(--surface); stroke-width:1.6; }
   .pin circle.ring{ fill:none; stroke-width:2; opacity:.55; }
@@ -570,7 +586,14 @@
           <button class="seg-btn" data-mode="region">지역별 집계</button>
         </div>
         <button class="btn ghost small" id="btnClearRegion" hidden>지역 해제 ✕</button>
+        <div class="map-zoom">
+          <button class="zoom-btn" id="btnMapOut" title="축소">−</button>
+          <span class="zoom-label mono" id="mapZoomLabel">1.0×</span>
+          <button class="zoom-btn" id="btnMapIn" title="확대">＋</button>
+          <button class="btn ghost small" id="btnMapReset" hidden>전체보기</button>
+        </div>
       </div>
+      <div class="map-hint">터치패드 핀치(또는 Ctrl+휠)로 지도만 확대 · 끌어서 이동</div>
       <div class="map-frame">
         <svg id="koreaMap" viewBox="0 0 520 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="대한민국 사고 발생 지도"></svg>
       </div>
@@ -833,8 +856,13 @@ function renderMapBase(){
   });
   svg.innerHTML = `<g id="provinces">${paths}</g><g id="pins"></g>`;
   svg.querySelectorAll(".province").forEach(el => {
-    el.addEventListener("click", () => toggleRegion(el.dataset.name));
+    el.addEventListener("click", () => {
+      if(mapDragMoved > MAP_DRAG_SLOP) return;   // 지도를 끌었을 뿐이면 무시
+      toggleRegion(el.dataset.name);
+    });
   });
+  mapBase = KOREA_MAP.viewBox.split(/\s+/).map(Number);
+  mapView = [...mapBase];
 }
 
 /* ---------------- 지역별 집계 ---------------- */
@@ -974,15 +1002,136 @@ function renderPins(list){
     const color = typeColor(inc.type);
     const matched = inc.samsungMatch && inc.samsungMatch.matched;
     const alertActive = matched && !inc.workflow.reviewed;
-    html += `<g class="pin${alertActive ? " alert":""}" data-id="${inc.id}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})">
+    // 확대해도 핀 크기는 그대로 보이도록 좌표를 남겨두고 배율만 따로 건다
+    html += `<g class="pin${alertActive ? " alert":""}" data-id="${inc.id}" data-x="${x.toFixed(1)}" data-y="${y.toFixed(1)}">
       ${alertActive ? `<circle class="ring" r="7" stroke="${color}"></circle>` : ""}
       <circle class="core" r="${matched?7:5.5}" fill="${color}"></circle>
     </g>`;
   });
   g.innerHTML = html;
+  rescalePins();
   g.querySelectorAll(".pin").forEach(el => {
-    el.addEventListener("click", () => openDetail(el.getAttribute("data-id")));
+    el.addEventListener("click", () => {
+      if(mapDragMoved > MAP_DRAG_SLOP) return;   // 지도를 끌었을 뿐이면 무시
+      openDetail(el.getAttribute("data-id"));
+    });
   });
+}
+
+/* ---------------- 지도 확대/이동 ----------------
+   페이지 전체가 확대되지 않도록 지도 위 핀치(ctrl+wheel)를 가로채
+   SVG viewBox만 조절한다. 드래그로 이동, 버튼으로도 확대/축소. */
+
+// 지도 좌표가 단순화돼 있어서 그 이상 키우면 형상이 뭉개진다
+const MAP_MAX_ZOOM = 6;
+const MAP_DRAG_SLOP = 4;
+let mapBase = null;      // [x, y, w, h] 원본 viewBox
+let mapView = null;      // 현재 viewBox
+let mapDragMoved = 0;
+
+function mapZoomK(){ return mapBase && mapView ? mapBase[2] / mapView[2] : 1; }
+
+function clampMapView(v){
+  let [x, y, w, h] = v;
+  const [bx, by, bw, bh] = mapBase;
+  const minW = bw / MAP_MAX_ZOOM;
+  if(w > bw){ h = h * (bw / w); w = bw; }
+  if(w < minW){ h = h * (minW / w); w = minW; }
+  x = Math.min(Math.max(x, bx), bx + bw - w);
+  y = Math.min(Math.max(y, by), by + bh - h);
+  return [x, y, w, h];
+}
+
+function setMapView(v){
+  mapView = clampMapView(v);
+  document.getElementById("koreaMap").setAttribute("viewBox", mapView.map(n => n.toFixed(2)).join(" "));
+  rescalePins();
+  updateMapZoomUI();
+}
+
+function rescalePins(){
+  const k = mapZoomK();
+  document.querySelectorAll("#pins .pin").forEach(el => {
+    el.setAttribute("transform", `translate(${el.dataset.x},${el.dataset.y}) scale(${(1/k).toFixed(3)})`);
+  });
+}
+
+function updateMapZoomUI(){
+  const k = mapZoomK();
+  document.getElementById("mapZoomLabel").textContent = `${k.toFixed(1)}×`;
+  document.getElementById("btnMapReset").hidden = k <= 1.01;
+  document.getElementById("koreaMap").classList.toggle("zoomed", k > 1.01);
+}
+
+function resetMapView(){ setMapView([...mapBase]); }
+
+// 화면 좌표를 기준점으로 배율 f 만큼 확대/축소
+function zoomMapAt(clientX, clientY, f){
+  const svg = document.getElementById("koreaMap");
+  const rect = svg.getBoundingClientRect();
+  const [x, y, w, h] = mapView;
+  const px = x + ((clientX - rect.left) / rect.width) * w;
+  const py = y + ((clientY - rect.top) / rect.height) * h;
+  const bw = mapBase[2], minW = bw / MAP_MAX_ZOOM;
+  if(w * f > bw) f = bw / w;
+  if(w * f < minW) f = minW / w;
+  setMapView([px - (px - x) * f, py - (py - y) * f, w * f, h * f]);
+}
+
+function zoomMapCenter(f){
+  const rect = document.getElementById("koreaMap").getBoundingClientRect();
+  zoomMapAt(rect.left + rect.width / 2, rect.top + rect.height / 2, f);
+}
+
+function wireMapZoom(){
+  const svg = document.getElementById("koreaMap");
+
+  svg.addEventListener("wheel", e => {
+    // 터치패드 핀치는 ctrlKey가 붙은 wheel로 들어온다.
+    // 이걸 막지 않으면 브라우저가 페이지 전체를 확대해버린다.
+    if(!e.ctrlKey) return;              // 일반 스크롤은 페이지에 그대로 넘긴다
+    e.preventDefault();
+    zoomMapAt(e.clientX, e.clientY, Math.exp(e.deltaY * 0.003));
+  }, { passive:false });
+
+  let dragStart = null;
+  let captured = false;
+  svg.addEventListener("pointerdown", e => {
+    if(e.button !== 0) return;
+    dragStart = { x:e.clientX, y:e.clientY, view:[...mapView] };
+    mapDragMoved = 0;
+    // 여기서 바로 포인터를 캡처하면 click 이벤트가 핀/시도가 아니라 svg로 가버려서
+    // 지도를 클릭해도 상세가 안 열린다. 실제로 끌기 시작한 뒤에만 캡처한다.
+  });
+  svg.addEventListener("pointermove", e => {
+    if(!dragStart) return;
+    const rect = svg.getBoundingClientRect();
+    const ddx = e.clientX - dragStart.x, ddy = e.clientY - dragStart.y;
+    mapDragMoved = Math.max(mapDragMoved, Math.abs(ddx) + Math.abs(ddy));
+    if(mapDragMoved <= MAP_DRAG_SLOP) return;
+    if(!captured){
+      try{ svg.setPointerCapture(e.pointerId); captured = true; }catch(_){}
+    }
+    setMapView([
+      dragStart.view[0] - (ddx / rect.width) * dragStart.view[2],
+      dragStart.view[1] - (ddy / rect.height) * dragStart.view[3],
+      dragStart.view[2], dragStart.view[3],
+    ]);
+  });
+  const endDrag = e => {
+    if(!dragStart) return;
+    dragStart = null;
+    if(captured){
+      try{ svg.releasePointerCapture(e.pointerId); }catch(_){}
+      captured = false;
+    }
+  };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+
+  document.getElementById("btnMapIn").addEventListener("click", () => zoomMapCenter(1/1.4));
+  document.getElementById("btnMapOut").addEventListener("click", () => zoomMapCenter(1.4));
+  document.getElementById("btnMapReset").addEventListener("click", resetMapView);
 }
 
 function renderLegend(){
@@ -1505,6 +1654,27 @@ const justAddedIds = new Set();
 function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function pick(arr){ return arr[randInt(0, arr.length-1)]; }
 
+// 삼성화재는 직급 대신 전원 "프로" 호칭을 쓴다.
+const UNDERWRITERS = [
+  { name:"송규석 프로", phone:"02-1234-5601", email:"gyuseok.song@dummy-samsungfire.example" },
+  { name:"송채원 프로", phone:"02-1234-5602", email:"chaewon.song@dummy-samsungfire.example" },
+  { name:"김민석 프로", phone:"02-1234-5603", email:"minseok.kim@dummy-samsungfire.example" },
+  { name:"원아현 프로", phone:"02-1234-5604", email:"ahyeon.won@dummy-samsungfire.example" },
+  { name:"손예진 프로", phone:"02-1234-5605", email:"yejin.son@dummy-samsungfire.example" },
+  { name:"이지훈 프로", phone:"02-1234-5606", email:"jihoon.lee@dummy-samsungfire.example" },
+  { name:"서우인 프로", phone:"02-1234-5607", email:"wooin.seo@dummy-samsungfire.example" },
+  { name:"신준용 프로", phone:"02-1234-5608", email:"junyong.shin@dummy-samsungfire.example" },
+  { name:"신동재 프로", phone:"02-1234-5609", email:"dongjae.shin@dummy-samsungfire.example" },
+  { name:"정보현 프로", phone:"02-1234-5610", email:"bohyeon.jung@dummy-samsungfire.example" },
+  { name:"이중서 프로", phone:"02-1234-5611", email:"jungseo.lee@dummy-samsungfire.example" },
+  { name:"박정원 프로", phone:"02-1234-5612", email:"jeongwon.park@dummy-samsungfire.example" },
+  { name:"윤수정 프로", phone:"02-1234-5613", email:"sujeong.yoon@dummy-samsungfire.example" },
+  { name:"이호준 프로", phone:"02-1234-5614", email:"hojun.lee@dummy-samsungfire.example" },
+  { name:"김재호 프로", phone:"02-1234-5615", email:"jaeho.kim@dummy-samsungfire.example" },
+  { name:"권민지 프로", phone:"02-1234-5616", email:"minji.kwon@dummy-samsungfire.example" },
+  { name:"한유경 프로", phone:"02-1234-5617", email:"yukyung.han@dummy-samsungfire.example" },
+];
+
 function buildStageHistoryForNew(type, baseDate){
   const seqByType = {
     "화재": ["신고접수","소방출동","진압중","진화완료"],
@@ -1569,7 +1739,7 @@ function maybeBuildContract(scn){
       pastLossCount: lossHistory ? lossHistory.claimCount : 0,
       contractType: { isNew, sinceYear, renewalCount },
       lossHistory,
-      underwriter: { name: pick(["김도윤 과장","이서연 대리","박지훈 차장","최민석 부장","정하은 과장"]), phone:"02-1234-56"+randInt(10,99), email:"underwriter@dummy-samsungfire.example" },
+      underwriter: pick(UNDERWRITERS),
     }],
   };
 }
@@ -1783,6 +1953,8 @@ async function init(){
   renderMapBase();
   renderLegend();
   wireEvents();
+  wireMapZoom();
+  updateMapZoomUI();
   setLivePillState();
   render();
 

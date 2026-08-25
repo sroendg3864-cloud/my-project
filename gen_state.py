@@ -105,12 +105,12 @@ incidents.append(incident(
                  True, 45, 52000000000, 52000000000, 30000000000, None, 52000000000,
                  500000000, 20, 3,
                  [{"company": "삼성화재", "percent": 45}, {"company": "DB손해보험", "percent": 35}, {"company": "현대해상", "percent": 20}],
-                 "김도윤 과장", "02-1234-5601", "doyoon.kim@dummy-samsungfire.example",
+                 "송규석 프로", "02-1234-5601", "gyuseok.song@dummy-samsungfire.example",
                  sinceYear=2018, renewalCount=8,
                  lossHistory=loss_history(8, 3, 820000000, 510000000, 2450000000)),
     ],
     alertSent=True,
-    alertLog=alert_log("2026-08-17T03:41:00", "김도윤 과장", "doyoon.kim@dummy-samsungfire.example"),
+    alertLog=alert_log("2026-08-17T03:41:00", "송규석 프로", "gyuseok.song@dummy-samsungfire.example"),
 ))
 
 # 2. Seoul overpass collapse (matched, liability)
@@ -133,12 +133,12 @@ incidents.append(incident(
                  True, 100, 10000000000, 10000000000, None, 500000000, 10000000000,
                  100000000, 0, 0,
                  [{"company": "삼성화재", "percent": 100}],
-                 "이서연 대리", "02-1234-5622", "seoyeon.lee@dummy-samsungfire.example",
+                 "송채원 프로", "02-1234-5622", "chaewon.song@dummy-samsungfire.example",
                  sinceYear=2015, renewalCount=11,
                  lossHistory=loss_history(11, 0, 0, 0, 3300000000)),
     ],
     alertSent=True,
-    alertLog=alert_log("2026-08-19T15:02:00", "이서연 대리", "seoyeon.lee@dummy-samsungfire.example"),
+    alertLog=alert_log("2026-08-19T15:02:00", "송채원 프로", "chaewon.song@dummy-samsungfire.example"),
 ))
 
 # 3. Geoje shipyard flood (matched, held small share)
@@ -161,12 +161,12 @@ incidents.append(incident(
                  True, 30, 15000000000, 15000000000, 15000000000, None, 15000000000,
                  300000000, 15, 2,
                  [{"company": "삼성화재", "percent": 30}, {"company": "메리츠화재", "percent": 40}, {"company": "KB손해보험", "percent": 30}],
-                 "박지훈 차장", "02-1234-5633", "jihoon.park@dummy-samsungfire.example",
+                 "김민석 프로", "02-1234-5633", "minseok.kim@dummy-samsungfire.example",
                  sinceYear=2021, renewalCount=5,
                  lossHistory=loss_history(5, 2, 460000000, 380000000, 910000000)),
     ],
     alertSent=True,
-    alertLog=alert_log("2026-08-20T06:22:00", "박지훈 차장", "jihoon.park@dummy-samsungfire.example"),
+    alertLog=alert_log("2026-08-20T06:22:00", "김민석 프로", "minseok.kim@dummy-samsungfire.example"),
 ))
 
 # 4. Hwaseong industrial complex fire (not matched)
@@ -206,7 +206,7 @@ incidents.append(incident(
                  1000000000, 40, 3,
                  [{"company": "삼성화재", "percent": 20}, {"company": "코리안리(재보험)", "percent": 0},
                   {"company": "현대해상", "percent": 30}, {"company": "DB손해보험", "percent": 25}, {"company": "KB손해보험", "percent": 25}],
-                 "최민석 부장", "02-1234-5644", "minseok.choi@dummy-samsungfire.example",
+                 "원아현 프로", "02-1234-5644", "ahyeon.won@dummy-samsungfire.example",
                  sinceYear=2012, renewalCount=14,
                  lossHistory=loss_history(14, 3, 11200000000, 7800000000, 26800000000)),
     ],
@@ -232,11 +232,11 @@ incidents.append(incident(
                  True, 60, 22000000000, 22000000000, None, 300000000, 22000000000,
                  200000000, 10, 0,
                  [{"company": "삼성화재", "percent": 60}, {"company": "한화손해보험", "percent": 40}],
-                 "정하은 과장", "02-1234-5655", "haeun.jung@dummy-samsungfire.example",
+                 "손예진 프로", "02-1234-5655", "yejin.son@dummy-samsungfire.example",
                  isNew=True),
     ],
     alertSent=True,
-    alertLog=alert_log("2026-08-23T09:55:00", "정하은 과장", "haeun.jung@dummy-samsungfire.example"),
+    alertLog=alert_log("2026-08-23T09:55:00", "손예진 프로", "yejin.son@dummy-samsungfire.example"),
 ))
 
 # 7. Daegu apartment fire (not matched)
@@ -292,7 +292,7 @@ incidents.append(incident(
                  1000000000, 30, 4,
                  [{"company": "삼성화재", "percent": 25}, {"company": "현대해상", "percent": 25},
                   {"company": "DB손해보험", "percent": 25}, {"company": "메리츠화재", "percent": 25}],
-                 "한지민 차장", "02-1234-5666", "jimin.han@dummy-samsungfire.example",
+                 "이지훈 프로", "02-1234-5666", "jihoon.lee@dummy-samsungfire.example",
                  sinceYear=2016, renewalCount=10,
                  lossHistory=loss_history(10, 4, 9600000000, 6100000000, 15200000000)),
     ],
@@ -318,7 +318,7 @@ incidents.append(incident(
                  True, 50, 4000000000, 4000000000, 4000000000, None, 4000000000,
                  50000000, 0, 2,
                  [{"company": "삼성화재", "percent": 50}, {"company": "롯데손해보험", "percent": 50}],
-                 "오세훈 대리", "02-1234-5677", "sehoon.oh@dummy-samsungfire.example",
+                 "서우인 프로", "02-1234-5677", "wooin.seo@dummy-samsungfire.example",
                  sinceYear=2020, renewalCount=4,
                  lossHistory=loss_history(5, 2, 110000000, 70000000, 180000000)),
     ],
@@ -361,12 +361,12 @@ incidents.append(incident(
                  2000000000, 50, 6,
                  [{"company": "삼성화재", "percent": 35}, {"company": "코리안리(재보험)", "percent": 0},
                   {"company": "현대해상", "percent": 35}, {"company": "KB손해보험", "percent": 30}],
-                 "윤서준 부장", "02-1234-5688", "seojun.yoon@dummy-samsungfire.example",
+                 "신준용 프로", "02-1234-5688", "junyong.shin@dummy-samsungfire.example",
                  sinceYear=2009, renewalCount=17,
                  lossHistory=loss_history(17, 6, 18400000000, 9200000000, 61000000000)),
     ],
     alertSent=True,
-    alertLog=alert_log("2026-08-25T02:31:00", "윤서준 부장", "seojun.yoon@dummy-samsungfire.example"),
+    alertLog=alert_log("2026-08-25T02:31:00", "신준용 프로", "junyong.shin@dummy-samsungfire.example"),
 ))
 
 # ---------------------------------------------------------------------------
@@ -456,15 +456,25 @@ TEMPLATES = [
 
 ENTITY_SUFFIX = ["로지스", "산업", "테크", "머티리얼즈", "케미칼", "정밀", "물산", "이엔지", "코퍼레이션", "에너지"]
 ENTITY_PREFIX = ["대한", "한성", "동진", "세명", "우성", "삼우", "신라", "태창", "금호", "청우", "はな".replace("はな","한별"), "성진"]
+# 삼성화재는 직급 대신 전원 "프로" 호칭을 쓴다.
 UWS = [
-    ("김도윤 과장", "02-1234-5601", "doyoon.kim@dummy-samsungfire.example"),
-    ("이서연 대리", "02-1234-5622", "seoyeon.lee@dummy-samsungfire.example"),
-    ("박지훈 차장", "02-1234-5633", "jihoon.park@dummy-samsungfire.example"),
-    ("최민석 부장", "02-1234-5644", "minseok.choi@dummy-samsungfire.example"),
-    ("정하은 과장", "02-1234-5655", "haeun.jung@dummy-samsungfire.example"),
-    ("한지민 차장", "02-1234-5666", "jimin.han@dummy-samsungfire.example"),
-    ("오세훈 대리", "02-1234-5677", "sehoon.oh@dummy-samsungfire.example"),
-    ("윤서준 부장", "02-1234-5688", "seojun.yoon@dummy-samsungfire.example"),
+    ("송규석 프로", "02-1234-5601", "gyuseok.song@dummy-samsungfire.example"),
+    ("송채원 프로", "02-1234-5602", "chaewon.song@dummy-samsungfire.example"),
+    ("김민석 프로", "02-1234-5603", "minseok.kim@dummy-samsungfire.example"),
+    ("원아현 프로", "02-1234-5604", "ahyeon.won@dummy-samsungfire.example"),
+    ("손예진 프로", "02-1234-5605", "yejin.son@dummy-samsungfire.example"),
+    ("이지훈 프로", "02-1234-5606", "jihoon.lee@dummy-samsungfire.example"),
+    ("서우인 프로", "02-1234-5607", "wooin.seo@dummy-samsungfire.example"),
+    ("신준용 프로", "02-1234-5608", "junyong.shin@dummy-samsungfire.example"),
+    ("신동재 프로", "02-1234-5609", "dongjae.shin@dummy-samsungfire.example"),
+    ("정보현 프로", "02-1234-5610", "bohyeon.jung@dummy-samsungfire.example"),
+    ("이중서 프로", "02-1234-5611", "jungseo.lee@dummy-samsungfire.example"),
+    ("박정원 프로", "02-1234-5612", "jeongwon.park@dummy-samsungfire.example"),
+    ("윤수정 프로", "02-1234-5613", "sujeong.yoon@dummy-samsungfire.example"),
+    ("이호준 프로", "02-1234-5614", "hojun.lee@dummy-samsungfire.example"),
+    ("김재호 프로", "02-1234-5615", "jaeho.kim@dummy-samsungfire.example"),
+    ("권민지 프로", "02-1234-5616", "minji.kwon@dummy-samsungfire.example"),
+    ("한유경 프로", "02-1234-5617", "yukyung.han@dummy-samsungfire.example"),
 ]
 PRODUCTS = ["재산종합보험(패키지)", "화재보험(재산종합)", "기업종합위험보험", "건설공사보험(CAR)",
             "시설물배상책임보험", "건물종합보험", "재산종합보험(기업휴지 포함)"]
@@ -591,7 +601,7 @@ def gen_bulk(n, start_seq):
             alerts = alert_log(at, uw["name"], uw["email"])
             if rng.random() < 0.5:
                 reviewed = True
-                reviewed_by = rng.choice(["기업보상팀 김주임", "기업보상팀 이대리", "손사팀 박과장"])
+                reviewed_by = "기업보상팀 " + rng.choice(UWS)[0]
                 reviewed_at = (occurred + timedelta(hours=rng.randint(2, 30))).strftime("%Y-%m-%dT%H:%M:00")
 
         # 오래된 사고일수록 조치가 끝나고 보험금까지 지급돼 종결된다.
