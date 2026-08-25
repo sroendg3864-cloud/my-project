@@ -31,6 +31,10 @@ def contract(policyNumber, product, policyholder, start, end, status,
         "underwriter": {"name": uw_name, "phone": uw_phone, "email": uw_email},
     }
 
+def alert_log(at, name, email):
+    """담당 언더라이터에게 알림이 나간 기록 (더미)."""
+    return [{"at": at, "text": f"{name}({email})에게 알림 발송됨"}]
+
 def incident(id, occurredAt, title, itype, industry, address, region, lat, lng,
              dead, injured, missing, lossType, estimatedLossKRW, damageNote,
              stage, history, sourceNote, entityName, bizRegNo,
@@ -81,6 +85,8 @@ incidents.append(incident(
                  [{"company": "삼성화재", "percent": 45}, {"company": "DB손해보험", "percent": 35}, {"company": "현대해상", "percent": 20}],
                  "김도윤 과장", "02-1234-5601", "doyoon.kim@dummy-samsungfire.example"),
     ],
+    alertSent=True,
+    alertLog=alert_log("2026-08-17T03:41:00", "김도윤 과장", "doyoon.kim@dummy-samsungfire.example"),
 ))
 
 # 2. Seoul overpass collapse (matched, liability)
@@ -105,6 +111,8 @@ incidents.append(incident(
                  [{"company": "삼성화재", "percent": 100}],
                  "이서연 대리", "02-1234-5622", "seoyeon.lee@dummy-samsungfire.example"),
     ],
+    alertSent=True,
+    alertLog=alert_log("2026-08-19T15:02:00", "이서연 대리", "seoyeon.lee@dummy-samsungfire.example"),
 ))
 
 # 3. Geoje shipyard flood (matched, held small share)
@@ -129,6 +137,8 @@ incidents.append(incident(
                  [{"company": "삼성화재", "percent": 30}, {"company": "메리츠화재", "percent": 40}, {"company": "KB손해보험", "percent": 30}],
                  "박지훈 차장", "02-1234-5633", "jihoon.park@dummy-samsungfire.example"),
     ],
+    alertSent=True,
+    alertLog=alert_log("2026-08-20T06:22:00", "박지훈 차장", "jihoon.park@dummy-samsungfire.example"),
 ))
 
 # 4. Hwaseong industrial complex fire (not matched)
@@ -194,6 +204,8 @@ incidents.append(incident(
                  [{"company": "삼성화재", "percent": 60}, {"company": "한화손해보험", "percent": 40}],
                  "정하은 과장", "02-1234-5655", "haeun.jung@dummy-samsungfire.example"),
     ],
+    alertSent=True,
+    alertLog=alert_log("2026-08-23T09:55:00", "정하은 과장", "haeun.jung@dummy-samsungfire.example"),
 ))
 
 # 7. Daegu apartment fire (not matched)
@@ -316,6 +328,8 @@ incidents.append(incident(
                   {"company": "현대해상", "percent": 35}, {"company": "KB손해보험", "percent": 30}],
                  "윤서준 부장", "02-1234-5688", "seojun.yoon@dummy-samsungfire.example"),
     ],
+    alertSent=True,
+    alertLog=alert_log("2026-08-25T02:31:00", "윤서준 부장", "seojun.yoon@dummy-samsungfire.example"),
 ))
 
 state = {
@@ -325,7 +339,9 @@ state = {
     "incidents": incidents,
 }
 
-with open("/home/claude/incident-radar/initial_state.json", "w", encoding="utf-8") as f:
+import os
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "initial_state.json")
+with open(OUT, "w", encoding="utf-8") as f:
     json.dump(state, f, ensure_ascii=False, indent=None)
 
 print("incidents:", len(incidents))

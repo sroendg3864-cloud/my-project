@@ -206,6 +206,57 @@
   .legend .item{ display:flex; align-items:center; gap:5px; }
   .legend .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
 
+  /* ---------- alert panel ---------- */
+  .alert-panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .alert-panel .ap-head{
+    display:flex; align-items:center; gap:8px;
+    padding:10px 12px; border-bottom:1px solid var(--border);
+  }
+  .alert-panel .ap-head h3{ font-size:13px; font-weight:600; margin:0; flex:1; }
+  .alert-panel .ap-count{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-variant-numeric:tabular-nums;
+    color:var(--ink-faint);
+  }
+  .alert-panel .ap-note{
+    padding:7px 12px; font-size:11.5px; color:var(--ink-faint);
+    background:var(--surface-2); border-bottom:1px solid var(--border);
+  }
+  .alert-panel .ap-list{ max-height:260px; overflow-y:auto; }
+  .alert-panel .ap-empty{ padding:16px 12px; font-size:12.5px; color:var(--ink-faint); text-align:center; }
+  .ap-item{
+    display:flex; gap:9px; padding:9px 12px; cursor:pointer;
+    border-bottom:1px solid var(--border); align-items:flex-start;
+  }
+  .ap-item:last-child{ border-bottom:none; }
+  .ap-item:hover{ background:var(--surface-2); }
+  .ap-item .ap-dot{
+    width:7px; height:7px; border-radius:50%; flex:none; margin-top:5px;
+  }
+  .ap-item.sent .ap-dot{ background:var(--success); }
+  .ap-item.pending .ap-dot{ background:var(--warning); animation:pulse 2s ease-in-out infinite; }
+  .ap-item .ap-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .ap-item .ap-title{
+    font-size:12.5px; font-weight:500; color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .ap-item .ap-to{
+    font-size:11.5px; color:var(--ink-dim);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .ap-item .ap-meta{
+    font-size:11px; color:var(--ink-faint); font-family:'IBM Plex Mono',monospace;
+    font-variant-numeric:tabular-nums;
+  }
+  .ap-item .ap-state{
+    font-size:10.5px; font-weight:600; flex:none; padding:2px 6px; border-radius:5px;
+    white-space:nowrap; align-self:flex-start;
+  }
+  .ap-item.sent .ap-state{ background:var(--success-soft); color:var(--success); }
+  .ap-item.pending .ap-state{ background:var(--warning-soft); color:var(--warning); }
+
   .filters{ display:flex; flex-direction:column; gap:8px; }
   .filter-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   select, input[type="text"], input[type="search"], textarea{
@@ -386,6 +437,16 @@
         <svg id="koreaMap" viewBox="0 0 520 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="대한민국 사고 발생 지도"></svg>
       </div>
       <div class="legend" id="mapLegend"></div>
+
+      <div class="alert-panel">
+        <div class="ap-head">
+          <h3>담당자 알림 현황</h3>
+          <span class="ap-count" id="alertPanelCount"></span>
+        </div>
+        <div class="ap-note">삼성화재 계약 연관 사고에 대해 담당 언더라이터에게 나가는 알림입니다.</div>
+        <div class="ap-list" id="alertPanelList"></div>
+      </div>
+
       <div class="filters">
         <div class="filter-row">
           <select id="filterType"></select>
@@ -672,6 +733,46 @@ function renderSummary(){
   document.getElementById("statCasualty").textContent = casualty;
 }
 
+function renderAlertPanel(){
+  // 삼성화재 연관 사고만 대상. 발송 대기(미검토) 건을 위로 올려서 보여준다.
+  const targets = STATE.incidents.filter(i => i.samsungMatch && i.samsungMatch.matched);
+  const rows = targets.map(inc => {
+    const uw = (inc.samsungMatch.contracts[0] || {}).underwriter || null;
+    const sent = inc.workflow.alertSent;
+    const lastLog = inc.workflow.alertLog[inc.workflow.alertLog.length - 1] || null;
+    return { inc, uw, sent, at: lastLog ? lastLog.at : null };
+  });
+  rows.sort((a,b) => {
+    if(a.sent !== b.sent) return a.sent ? 1 : -1;      // 대기 건 먼저
+    return b.inc.occurredAt.localeCompare(a.inc.occurredAt);  // 그다음 최신순
+  });
+
+  const sentCount = rows.filter(r => r.sent).length;
+  document.getElementById("alertPanelCount").textContent =
+    rows.length ? `발송 ${sentCount} · 대기 ${rows.length - sentCount}` : "";
+
+  const list = document.getElementById("alertPanelList");
+  if(!rows.length){
+    list.innerHTML = `<div class="ap-empty">알림 대상 사고가 없습니다.</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(r => `
+    <div class="ap-item ${r.sent ? "sent" : "pending"}" data-id="${escapeHtml(r.inc.id)}">
+      <span class="ap-dot"></span>
+      <div class="ap-body">
+        <div class="ap-title">${escapeHtml(r.inc.title)}</div>
+        <div class="ap-to">${r.uw ? escapeHtml(r.uw.name) : "담당자 미지정"}${r.uw ? " · " + escapeHtml(r.uw.email) : ""}</div>
+        <div class="ap-meta">${r.sent && r.at ? fmtDateTime(r.at) + " 발송" : "발송 대기 중"}</div>
+      </div>
+      <span class="ap-state">${r.sent ? "발송됨" : "대기"}</span>
+    </div>
+  `).join("");
+
+  list.querySelectorAll(".ap-item").forEach(el => {
+    el.addEventListener("click", () => openDetail(el.dataset.id));
+  });
+}
+
 function updateLastUpdatedPill(){
   document.getElementById("lastUpdatedPill").textContent = "마지막 업데이트 " + fmtDateTime(STATE.lastUpdated) + " (" + fmtRelative(STATE.lastUpdated) + ")";
 }
@@ -870,6 +971,7 @@ function render(){
   const filtered = applyFilters(STATE.incidents);
   renderPins(filtered);
   renderFeed(filtered);
+  renderAlertPanel();
   if(openDetailId) renderDetail();
 }
 
