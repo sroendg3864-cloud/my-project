@@ -75,7 +75,21 @@ EOF
 
 - 검색 중이면 **검색에 걸린 종결 건도 함께** 내보냅니다.
 - 엑셀에서 한글이 깨지지 않도록 BOM을 붙입니다.
-- Artifact의 `downloads` 캡슐이 있으면 파일로 저장하고, 없으면 클립보드로 복사합니다. **배포 시 파일 저장을 쓰려면 `capabilities: {downloads: true}` 선언이 필요합니다.**
+
+**내보내기 경로가 5단계인 이유**: Artifact 뷰어와 사이드패널은 **샌드박스 iframe**이라
+스크립트가 시작한 다운로드가 무력화되고 Clipboard API도 permissions policy로 막힙니다
+(`NotAllowedError: The Clipboard API has been blocked because of a permissions policy`).
+그래서 환경별로 순서대로 내려갑니다.
+
+1. `claude.use("downloads")` — 배포된 Artifact에서 진짜 파일로 저장.
+   **쓰려면 발행할 때 `capabilities: {downloads: true}` 선언 필요.**
+2. Blob + `<a download>` — 일반 브라우저 탭에서만. iframe 안에서는 조용히 씹히므로
+   `inIframe()`으로 걸러서 **성공한 척하지 않습니다.**
+3. `navigator.clipboard.writeText` — 허용된 환경에서.
+4. `document.execCommand("copy")` — 구식 API지만 **샌드박스 iframe에서도 통합니다.**
+   실제로 Artifact 환경에서 동작하는 건 이 경로입니다.
+5. 전부 막히면 CSV 전문을 담은 창을 띄워 직접 복사하게 합니다 (`openCsvFallback()`).
+   여기서 실패할 일은 없습니다.
 
 ## 화면 레이아웃 (웹 3단)
 넓은 화면에서는 **지도 / 속보 피드 / 사이드레일** 3단으로 펼쳐집니다 (`.layout`의 grid-template-areas).

@@ -547,6 +547,29 @@
   @keyframes toastin{ from{ opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
   .toast a, .toast button.link{ color:#fff; text-decoration:underline; background:none; border:none; cursor:pointer; font-size:13px; padding:0; }
 
+  /* CSV 폴백 창 — 다운로드도 클립보드도 막힌 환경에서 손으로 복사하는 마지막 수단 */
+  .csv-modal{
+    position:fixed; inset:0; z-index:60; display:none;
+    align-items:center; justify-content:center; padding:24px;
+    background:color-mix(in srgb, #000 45%, transparent);
+  }
+  .csv-modal.show{ display:flex; }
+  .csv-box{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:0 18px 48px rgba(0,0,0,.28); width:min(760px,100%); max-height:82vh;
+    display:flex; flex-direction:column; gap:10px; padding:16px;
+  }
+  .csv-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .csv-head h3{ font-size:15px; }
+  .csv-note{ font-size:12.5px; color:var(--ink-dim); }
+  .csv-box textarea{
+    flex:1; min-height:260px; resize:vertical; width:100%;
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; line-height:1.5;
+    white-space:pre; overflow:auto;
+  }
+  .csv-actions{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .csv-hint{ font-size:11.5px; color:var(--ink-faint); }
+
   .footnote{ font-size:11.5px; color:var(--ink-faint); text-align:center; padding:18px 20px 26px; }
 
   ::-webkit-scrollbar{ width:10px; height:10px; }
@@ -701,6 +724,21 @@
   </main>
 
   <div class="footnote">이 화면의 사고·뉴스·계약 정보는 전부 가상의 예시 데이터이며 실제 사고·보험 계약과 무관합니다. 실제 연동 시 뉴스 API와 사내 계약관리 시스템 API로 교체가 필요합니다.</div>
+</div>
+
+<div class="csv-modal" id="csvModal">
+  <div class="csv-box">
+    <div class="csv-head">
+      <h3>CSV 내보내기</h3>
+      <button class="btn ghost small" id="csvModalClose">닫기 ✕</button>
+    </div>
+    <div class="csv-note" id="csvModalCount"></div>
+    <textarea id="csvModalText" readonly spellcheck="false"></textarea>
+    <div class="csv-actions">
+      <span class="csv-hint">Ctrl+C (Mac은 ⌘+C) 로 복사하세요.</span>
+      <button class="btn primary small" id="csvModalCopy">전체 선택 후 복사</button>
+    </div>
+  </div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -1309,29 +1347,88 @@ function buildCsv(list){
   return [head, ...rows].join("\r\n");
 }
 
+// 이 페이지가 iframe 안(=Artifact 뷰어/사이드패널)에서 돌고 있는가.
+// 그 안에서는 스크립트가 시작한 다운로드가 무력화되고 Clipboard API도 막혀 있어서,
+// 성공한 척하지 않으려면 경로를 갈라야 한다.
+function inIframe(){
+  try{ return window.self !== window.top; }catch(_){ return true; }
+}
+
+// 구식 API지만 샌드박스 iframe에서도 통하는 유일한 복사 수단
+function legacyCopy(text){
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0;";
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  let ok = false;
+  try{ ok = document.execCommand("copy"); }catch(_){ ok = false; }
+  ta.remove();
+  return ok;
+}
+
 async function exportCsv(){
   // 지금 보고 있는 목록 + 검색에 걸린 종결 건까지 함께 내보낸다
   const list = [...applyFilters(liveIncidents()), ...closedSearchHits()];
   if(!list.length){ showToast("내보낼 사고가 없습니다.", false); return; }
   const csv = "﻿" + buildCsv(list);   // BOM: 엑셀에서 한글이 깨지지 않게
+  const filename = `incident-radar-${activeCountry}-${dataToday()}.csv`;
 
+  // 1) 배포된 Artifact에서 downloads 캡슐이 있으면 진짜 파일로 저장
   try{
     const dl = window.claude ? await window.claude.use("downloads") : null;
     if(dl){
-      await dl.save({ filename: `incident-radar-${activeCountry}-${dataToday()}.csv`, data: csv });
-      showToast(`${list.length}건을 CSV로 저장했습니다.`, false);
+      await dl.save({ filename, data: csv });
+      showToast(`${list.length}건을 CSV 파일로 저장했습니다.`, false);
       return;
     }
-  }catch(err){
-    console.warn("download failed", err);
+  }catch(err){ console.warn("downloads capability failed", err); }
+
+  // 2) 일반 브라우저 탭이면 blob 다운로드. iframe 안에서는 조용히 씹히므로 건너뛴다.
+  if(!inIframe()){
+    try{
+      const url = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(`${list.length}건을 ${filename} 로 내려받았습니다.`, false);
+      return;
+    }catch(err){ console.warn("blob download failed", err); }
   }
-  // 저장을 못 쓰는 환경이면 클립보드로 떨군다 (엑셀에 그대로 붙여넣기 가능)
+
+  // 3) 클립보드 (샌드박스에서는 permissions policy로 막히는 경우가 많다)
   try{
     await navigator.clipboard.writeText(csv);
     showToast(`${list.length}건을 클립보드에 복사했습니다. 엑셀에 붙여넣으세요.`, false);
-  }catch(_){
-    showToast("내보내기에 실패했습니다.", false);
+    return;
+  }catch(err){ console.warn("clipboard API blocked", err); }
+
+  // 4) 구식 복사 — 샌드박스 iframe에서도 대개 통한다
+  if(legacyCopy(csv)){
+    showToast(`${list.length}건을 클립보드에 복사했습니다. 엑셀에 붙여넣으세요.`, false);
+    return;
   }
+
+  // 5) 전부 막혔으면 직접 복사할 수 있게 창을 띄운다 (여기서 실패할 일은 없다)
+  openCsvFallback(csv, list.length, filename);
+}
+
+function openCsvFallback(csv, count, filename){
+  const wrap = document.getElementById("csvModal");
+  document.getElementById("csvModalCount").textContent =
+    `${count}건 · ${filename} — 아래 내용을 복사해서 엑셀에 붙여넣으세요.`;
+  const ta = document.getElementById("csvModalText");
+  ta.value = csv;
+  wrap.classList.add("show");
+  ta.focus(); ta.select();
+}
+
+function closeCsvFallback(){
+  document.getElementById("csvModal").classList.remove("show");
+  document.getElementById("csvModalText").value = "";
 }
 
 /* ---------------- date filter ---------------- */
@@ -2157,6 +2254,17 @@ function wireEvents(){
     sortMode = e.target.value; render();
   });
   document.getElementById("btnExportCsv").addEventListener("click", exportCsv);
+  document.getElementById("csvModalClose").addEventListener("click", closeCsvFallback);
+  document.getElementById("csvModal").addEventListener("click", e => {
+    if(e.target.id === "csvModal") closeCsvFallback();       // 바깥을 누르면 닫기
+  });
+  document.getElementById("csvModalCopy").addEventListener("click", () => {
+    const ta = document.getElementById("csvModalText");
+    ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
+    try{ ok = document.execCommand("copy"); }catch(_){}
+    showToast(ok ? "클립보드에 복사했습니다." : "전체가 선택됐습니다. Ctrl+C 로 복사하세요.", false);
+  });
   document.querySelectorAll("#countrySwitch .seg-btn").forEach(b => {
     b.addEventListener("click", () => switchCountry(b.dataset.country));
   });
@@ -2183,7 +2291,11 @@ function wireEvents(){
     setLivePillState();
   });
   document.getElementById("scrim").addEventListener("click", closeDetail);
-  document.addEventListener("keydown", e => { if(e.key === "Escape") closeDetail(); });
+  document.addEventListener("keydown", e => {
+    if(e.key !== "Escape") return;
+    if(document.getElementById("csvModal").classList.contains("show")) closeCsvFallback();
+    else closeDetail();
+  });
 }
 
 async function init(){
