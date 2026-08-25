@@ -306,6 +306,8 @@
   .badge.match{ background:var(--danger-soft); color:var(--danger); }
   .badge.nomatch{ background:var(--surface-2); color:var(--ink-faint); }
   .badge.reviewed{ background:var(--success-soft); color:var(--success); }
+  .badge.newpol{ background:var(--accent-soft); color:var(--accent-strong); }
+  .badge.renewpol{ background:var(--surface-2); color:var(--ink-dim); }
   .ci-stats{ display:flex; gap:16px; margin-top:9px; font-size:12.5px; color:var(--ink-dim); flex-wrap:wrap; }
   .ci-stats b{ color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600; }
   .ci-loc{ font-size:12px; color:var(--ink-faint); margin-top:3px; }
@@ -357,6 +359,37 @@
   .pill-status{ font-size:11px; font-weight:600; padding:2px 8px; border-radius:99px; white-space:nowrap; }
   .pill-status.유효{ background:var(--success-soft); color:var(--success); }
   .pill-status.만기, .pill-status.실효{ background:var(--warning-soft); color:var(--warning); }
+  .pill-new{ background:var(--accent-soft); color:var(--accent-strong); }
+  .pill-renew{ background:var(--surface); color:var(--ink-dim); border:1px solid var(--border); }
+
+  /* 과거 손해 이력 */
+  .loss-hist{
+    border:1px solid var(--border); border-radius:10px; padding:10px 11px;
+    background:var(--surface); display:flex; flex-direction:column; gap:9px;
+  }
+  .loss-hist .lh-title{
+    font-size:11.5px; font-weight:600; color:var(--ink-dim);
+    display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  }
+  .loss-hist .lh-title .lh-period{ font-weight:400; color:var(--ink-faint); font-size:11px; }
+  .lh-stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .lh-stat{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .lh-stat .lh-label{ font-size:10.5px; color:var(--ink-faint); }
+  .lh-stat .lh-val{
+    font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+  .lh-stat .lh-sub{ font-size:10.5px; color:var(--ink-faint); }
+  .lh-val.good{ color:var(--success); }
+  .lh-val.warn{ color:var(--warning); }
+  .lh-val.bad{ color:var(--danger); }
+  .lh-bar{ height:5px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+  .lh-bar span{ display:block; height:100%; border-radius:99px; }
+  .lh-bar span.good{ background:var(--success); }
+  .lh-bar span.warn{ background:var(--warning); }
+  .lh-bar span.bad{ background:var(--danger); }
+  .lh-empty{ font-size:12px; color:var(--ink-faint); }
+
   .coins-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
   .coins-table td{ padding:4px 0; border-bottom:1px dashed var(--border); }
   .coins-table tr:last-child td{ border-bottom:none; }
@@ -697,6 +730,18 @@ function renderFeed(list){
   });
 }
 
+// 피드 카드용: 연관 계약이 신규인지 갱신인지, 갱신이면 손해율까지 한 줄로.
+function policyBadgeHtml(inc){
+  const c = (inc.samsungMatch && inc.samsungMatch.contracts || [])[0];
+  if(!c) return "";
+  const t = c.contractType;
+  if(!t) return "";
+  if(t.isNew) return `<span class="badge newpol">신규계약</span>`;
+  const lh = c.lossHistory;
+  const lr = lh ? ` · 손해율 ${lh.lossRatioPercent}%` : "";
+  return `<span class="badge renewpol">갱신 ${t.renewalCount}회${lr}</span>`;
+}
+
 function feedCardHtml(inc){
   const matched = inc.samsungMatch && inc.samsungMatch.matched;
   const cas = inc.casualties;
@@ -711,6 +756,7 @@ function feedCardHtml(inc){
       <span class="badge type">${inc.type} · ${inc.industry}</span>
       <span class="badge stage">${escapeHtml(inc.responseStage)}</span>
       ${matched ? `<span class="badge match">🔺 삼성화재 연관</span>` : `<span class="badge nomatch">연관 없음</span>`}
+      ${matched ? policyBadgeHtml(inc) : ""}
       ${inc.workflow.reviewed ? `<span class="badge reviewed">검토완료</span>` : ""}
     </div>
     <div class="ci-stats">
@@ -807,17 +853,72 @@ function stepperHtml(history, currentStage){
     </div>`).join("") + `</div>`;
 }
 
+// 손해율 구간별 색상: 50% 미만 양호 / 80% 미만 주의 / 그 이상 위험
+function lossRatioClass(pct){
+  if(pct < 50) return "good";
+  if(pct < 80) return "warn";
+  return "bad";
+}
+
+function contractTypeHtml(c){
+  const t = c.contractType || {isNew:false, sinceYear:null, renewalCount:0};
+  if(t.isNew) return `<span class="pill-status pill-new">신규</span>`;
+  return `<span class="pill-status pill-renew">갱신 ${t.renewalCount}회</span>`;
+}
+
+function lossHistoryHtml(c){
+  const t = c.contractType || {};
+  const lh = c.lossHistory;
+  if(t.isNew || !lh){
+    return `<div class="loss-hist">
+      <div class="lh-title"><span>과거 손해 이력</span></div>
+      <div class="lh-empty">신규 계약 — 삼성화재 인수 이력이 없어 과거 손해 데이터가 없습니다.</div>
+    </div>`;
+  }
+  const cls = lossRatioClass(lh.lossRatioPercent);
+  const barWidth = Math.min(100, lh.lossRatioPercent);
+  return `<div class="loss-hist">
+    <div class="lh-title">
+      <span>과거 손해 이력</span>
+      <span class="lh-period">최근 ${lh.observedYears}년 · ${t.sinceYear}년 최초 인수</span>
+    </div>
+    <div class="lh-stats">
+      <div class="lh-stat">
+        <span class="lh-label">빈도</span>
+        <span class="lh-val">${lh.claimCount}건</span>
+        <span class="lh-sub">연평균 ${lh.avgClaimsPerYear}건</span>
+      </div>
+      <div class="lh-stat">
+        <span class="lh-label">심도(누적)</span>
+        <span class="lh-val">${lh.claimCount ? fmtKRW(lh.totalIncurredKRW) : "—"}</span>
+        <span class="lh-sub">${lh.claimCount ? `건당 평균 ${fmtKRW(lh.avgSeverityKRW)} · 최대 ${fmtKRW(lh.largestLossKRW)}` : "무사고 기간"}</span>
+      </div>
+      <div class="lh-stat">
+        <span class="lh-label">손해율</span>
+        <span class="lh-val ${cls}">${lh.lossRatioPercent}%</span>
+        <span class="lh-sub">경과보험료 ${fmtKRW(lh.earnedPremiumKRW)}</span>
+      </div>
+    </div>
+    <div class="lh-bar"><span class="${cls}" style="width:${barWidth}%"></span></div>
+  </div>`;
+}
+
 function contractCardHtml(c){
   const coinsRows = c.coinsurance.map(r => `<tr><td>${escapeHtml(r.company)}</td><td class="pct">${r.percent}%</td></tr>`).join("");
+  const t = c.contractType || {};
   return `<div class="contract-card">
     <div class="contract-head">
       <div>
         <div class="pn mono">${escapeHtml(c.policyNumber)}</div>
         <div style="font-size:12.5px;color:var(--ink-dim);margin-top:2px;">${escapeHtml(c.product)} · ${escapeHtml(c.policyholder)}</div>
       </div>
-      <span class="pill-status ${c.status}">${c.status}</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">
+        ${contractTypeHtml(c)}
+        <span class="pill-status ${c.status}">${c.status}</span>
+      </div>
     </div>
     <dl class="kv-grid">
+      <dt>계약 구분</dt><dd>${t.isNew ? "신규 계약 (최초 인수)" : `갱신 계약 · <b>${t.sinceYear}년</b>부터 <b>${t.renewalCount}회</b> 갱신`}</dd>
       <dt>보험기간</dt><dd class="mono">${c.policyPeriod.start} ~ ${c.policyPeriod.end}</dd>
       <dt>삼성화재 보유</dt><dd>${c.samsungShare.held ? `보유 · 전체 보험료의 <b class="mono">${c.samsungShare.percentOfTotalPremium}%</b>` : "미보유"}</dd>
       <dt>보험가입금액</dt><dd class="mono">${fmtKRW(c.sumInsured)}</dd>
@@ -827,8 +928,8 @@ function contractCardHtml(c){
       </dd>
       <dt>자기부담금</dt><dd class="mono">${fmtKRW(c.deductible)}</dd>
       <dt>재보험 출재</dt><dd>${c.reinsuranceCededPercent}%</dd>
-      <dt>과거 유사사고</dt><dd>${c.pastLossCount}건</dd>
     </dl>
+    ${lossHistoryHtml(c)}
     ${c.coinsurance.length > 1 ? `<div><div class="section-title" style="margin-bottom:6px;">공동인수 구성</div><table class="coins-table">${coinsRows}</table></div>` : ""}
     <div class="uw-box">
       <div class="uw-avatar">${escapeHtml(c.underwriter.name.slice(0,1))}</div>
@@ -1013,9 +1114,32 @@ function buildStageHistoryForNew(type, baseDate){
   });
 }
 
+function buildLossHistory(years){
+  const claims = randInt(0,5);
+  const premium = randInt(8,600) * 100000000;
+  // 무사고면 손해율 0. 아니면 대략 10~95% 손해율이 나오도록 손해액을 역산한다.
+  const incurred = claims ? Math.round(premium * randInt(10,95) / 100) : 0;
+  const largest = claims ? Math.round(incurred * (randInt(45,90)/100)) : 0;
+  return {
+    observedYears: years,
+    claimCount: claims,
+    avgClaimsPerYear: Math.round(claims / years * 100) / 100,
+    totalIncurredKRW: incurred,
+    avgSeverityKRW: claims ? Math.round(incurred / claims) : 0,
+    largestLossKRW: largest,
+    earnedPremiumKRW: premium,
+    lossRatioPercent: Math.round(incurred / premium * 1000) / 10,
+  };
+}
+
 function maybeBuildContract(scn){
   if(Math.random() < 0.4) return { matched:false, confidence:"낮음", contracts:[] };
   const held = randInt(20,70);
+  // 신규 계약이면 과거 손해 이력이 없다.
+  const isNew = Math.random() < 0.25;
+  const sinceYear = isNew ? null : randInt(2009, 2024);
+  const renewalCount = isNew ? 0 : 2026 - sinceYear;
+  const lossHistory = isNew ? null : buildLossHistory(renewalCount);
   const sumInsured = randInt(20,300) * 100000000 * 10; // tens of billions range
   const seq = String(1000 + randInt(0,8999));
   const products = ["재산종합보험(패키지)","화재보험","기업종합위험보험","건설공사보험(CAR)"];
@@ -1035,7 +1159,9 @@ function maybeBuildContract(scn){
       coinsurance: [{company:"삼성화재", percent:held}, {company:partner, percent:100-held}],
       deductible: 100000000 * randInt(1,10),
       reinsuranceCededPercent: randInt(0,30),
-      pastLossCount: randInt(0,3),
+      pastLossCount: lossHistory ? lossHistory.claimCount : 0,
+      contractType: { isNew, sinceYear, renewalCount },
+      lossHistory,
       underwriter: { name: pick(["김도윤 과장","이서연 대리","박지훈 차장","최민석 부장","정하은 과장"]), phone:"02-1234-56"+randInt(10,99), email:"underwriter@dummy-samsungfire.example" },
     }],
   };

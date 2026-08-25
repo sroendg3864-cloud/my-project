@@ -11,9 +11,23 @@ def stage_history(stages_with_offsets, base_iso):
         out.append({"stage": stage, "at": t.strftime("%Y-%m-%dT%H:%M:00")})
     return out
 
+def loss_history(years, claims, incurred, largest, premium):
+    """과거 손해 이력 — 빈도(건수)·심도(금액)·손해율. 전부 더미."""
+    return {
+        "observedYears": years,
+        "claimCount": claims,
+        "avgClaimsPerYear": round(claims / years, 2) if years else 0,
+        "totalIncurredKRW": incurred,
+        "avgSeverityKRW": round(incurred / claims) if claims else 0,
+        "largestLossKRW": largest,
+        "earnedPremiumKRW": premium,
+        "lossRatioPercent": round(incurred / premium * 100, 1) if premium else 0,
+    }
+
 def contract(policyNumber, product, policyholder, start, end, status,
              held, sharePct, sumInsured, lol, perBuilding, perPerson, perOccurrence,
-             deductible, reins, pastLoss, coinsurance, uw_name, uw_phone, uw_email):
+             deductible, reins, pastLoss, coinsurance, uw_name, uw_phone, uw_email,
+             isNew=False, sinceYear=None, renewalCount=0, lossHistory=None):
     return {
         "policyNumber": policyNumber,
         "product": product,
@@ -28,6 +42,8 @@ def contract(policyNumber, product, policyholder, start, end, status,
         "deductible": deductible,
         "reinsuranceCededPercent": reins,
         "pastLossCount": pastLoss,
+        "contractType": {"isNew": isNew, "sinceYear": sinceYear, "renewalCount": renewalCount},
+        "lossHistory": lossHistory,
         "underwriter": {"name": uw_name, "phone": uw_phone, "email": uw_email},
     }
 
@@ -81,9 +97,11 @@ incidents.append(incident(
         contract("SF-2026-FR-118820", "화재보험(재산종합)", "㈜정왕로지스틱스",
                  "2026-03-01", "2027-02-28", "유효",
                  True, 45, 52000000000, 52000000000, 30000000000, None, 52000000000,
-                 500000000, 20, 1,
+                 500000000, 20, 3,
                  [{"company": "삼성화재", "percent": 45}, {"company": "DB손해보험", "percent": 35}, {"company": "현대해상", "percent": 20}],
-                 "김도윤 과장", "02-1234-5601", "doyoon.kim@dummy-samsungfire.example"),
+                 "김도윤 과장", "02-1234-5601", "doyoon.kim@dummy-samsungfire.example",
+                 sinceYear=2018, renewalCount=8,
+                 lossHistory=loss_history(8, 3, 820000000, 510000000, 2450000000)),
     ],
     alertSent=True,
     alertLog=alert_log("2026-08-17T03:41:00", "김도윤 과장", "doyoon.kim@dummy-samsungfire.example"),
@@ -109,7 +127,9 @@ incidents.append(incident(
                  True, 100, 10000000000, 10000000000, None, 500000000, 10000000000,
                  100000000, 0, 0,
                  [{"company": "삼성화재", "percent": 100}],
-                 "이서연 대리", "02-1234-5622", "seoyeon.lee@dummy-samsungfire.example"),
+                 "이서연 대리", "02-1234-5622", "seoyeon.lee@dummy-samsungfire.example",
+                 sinceYear=2015, renewalCount=11,
+                 lossHistory=loss_history(11, 0, 0, 0, 3300000000)),
     ],
     alertSent=True,
     alertLog=alert_log("2026-08-19T15:02:00", "이서연 대리", "seoyeon.lee@dummy-samsungfire.example"),
@@ -135,7 +155,9 @@ incidents.append(incident(
                  True, 30, 15000000000, 15000000000, 15000000000, None, 15000000000,
                  300000000, 15, 2,
                  [{"company": "삼성화재", "percent": 30}, {"company": "메리츠화재", "percent": 40}, {"company": "KB손해보험", "percent": 30}],
-                 "박지훈 차장", "02-1234-5633", "jihoon.park@dummy-samsungfire.example"),
+                 "박지훈 차장", "02-1234-5633", "jihoon.park@dummy-samsungfire.example",
+                 sinceYear=2021, renewalCount=5,
+                 lossHistory=loss_history(5, 2, 460000000, 380000000, 910000000)),
     ],
     alertSent=True,
     alertLog=alert_log("2026-08-20T06:22:00", "박지훈 차장", "jihoon.park@dummy-samsungfire.example"),
@@ -178,7 +200,9 @@ incidents.append(incident(
                  1000000000, 40, 3,
                  [{"company": "삼성화재", "percent": 20}, {"company": "코리안리(재보험)", "percent": 0},
                   {"company": "현대해상", "percent": 30}, {"company": "DB손해보험", "percent": 25}, {"company": "KB손해보험", "percent": 25}],
-                 "최민석 부장", "02-1234-5644", "minseok.choi@dummy-samsungfire.example"),
+                 "최민석 부장", "02-1234-5644", "minseok.choi@dummy-samsungfire.example",
+                 sinceYear=2012, renewalCount=14,
+                 lossHistory=loss_history(14, 3, 11200000000, 7800000000, 26800000000)),
     ],
 ))
 
@@ -202,7 +226,8 @@ incidents.append(incident(
                  True, 60, 22000000000, 22000000000, None, 300000000, 22000000000,
                  200000000, 10, 0,
                  [{"company": "삼성화재", "percent": 60}, {"company": "한화손해보험", "percent": 40}],
-                 "정하은 과장", "02-1234-5655", "haeun.jung@dummy-samsungfire.example"),
+                 "정하은 과장", "02-1234-5655", "haeun.jung@dummy-samsungfire.example",
+                 isNew=True),
     ],
     alertSent=True,
     alertLog=alert_log("2026-08-23T09:55:00", "정하은 과장", "haeun.jung@dummy-samsungfire.example"),
@@ -258,10 +283,12 @@ incidents.append(incident(
         contract("SF-2026-PK-118804", "재산종합보험(기업휴지 포함)", "㈜포항스틸웍스",
                  "2026-04-01", "2027-03-31", "유효",
                  True, 25, 90000000000, 90000000000, 90000000000, None, 90000000000,
-                 1000000000, 30, 1,
+                 1000000000, 30, 4,
                  [{"company": "삼성화재", "percent": 25}, {"company": "현대해상", "percent": 25},
                   {"company": "DB손해보험", "percent": 25}, {"company": "메리츠화재", "percent": 25}],
-                 "한지민 차장", "02-1234-5666", "jimin.han@dummy-samsungfire.example"),
+                 "한지민 차장", "02-1234-5666", "jimin.han@dummy-samsungfire.example",
+                 sinceYear=2016, renewalCount=10,
+                 lossHistory=loss_history(10, 4, 9600000000, 6100000000, 15200000000)),
     ],
 ))
 
@@ -285,7 +312,9 @@ incidents.append(incident(
                  True, 50, 4000000000, 4000000000, 4000000000, None, 4000000000,
                  50000000, 0, 2,
                  [{"company": "삼성화재", "percent": 50}, {"company": "롯데손해보험", "percent": 50}],
-                 "오세훈 대리", "02-1234-5677", "sehoon.oh@dummy-samsungfire.example"),
+                 "오세훈 대리", "02-1234-5677", "sehoon.oh@dummy-samsungfire.example",
+                 sinceYear=2020, renewalCount=4,
+                 lossHistory=loss_history(5, 2, 110000000, 70000000, 180000000)),
     ],
 ))
 
@@ -323,10 +352,12 @@ incidents.append(incident(
         contract("SF-2025-EG-330771", "재산종합보험(발전설비)", "㈜당진파워",
                  "2025-12-01", "2026-11-30", "유효",
                  True, 35, 200000000000, 150000000000, 150000000000, None, 150000000000,
-                 2000000000, 50, 1,
+                 2000000000, 50, 6,
                  [{"company": "삼성화재", "percent": 35}, {"company": "코리안리(재보험)", "percent": 0},
                   {"company": "현대해상", "percent": 35}, {"company": "KB손해보험", "percent": 30}],
-                 "윤서준 부장", "02-1234-5688", "seojun.yoon@dummy-samsungfire.example"),
+                 "윤서준 부장", "02-1234-5688", "seojun.yoon@dummy-samsungfire.example",
+                 sinceYear=2009, renewalCount=17,
+                 lossHistory=loss_history(17, 6, 18400000000, 9200000000, 61000000000)),
     ],
     alertSent=True,
     alertLog=alert_log("2026-08-25T02:31:00", "윤서준 부장", "seojun.yoon@dummy-samsungfire.example"),

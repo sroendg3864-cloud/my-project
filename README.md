@@ -43,6 +43,25 @@ EOF
 
 **주의**: 이 패널은 알림 상태를 **표시만** 합니다. 실제 메일/문자가 나가지는 않습니다 (기존 상세 패널의 "담당자에게 알림 전송" 버튼도 동일하게 시뮬레이션입니다).
 
+## 계약 이력 · 과거 손해 정보
+계약이 **신규**인지 **갱신**인지, 갱신이면 언제부터 몇 회 갱신했는지와 그 계약·물건의 과거 손해 이력(빈도·심도·손해율)을 함께 보여줍니다.
+
+**데이터 필드** (`gen_state.py`의 `contract()` / `loss_history()`)
+- `contractType`: `{ isNew, sinceYear, renewalCount }` — 신규 여부, 최초 인수년도, 갱신 횟수
+- `lossHistory`: 신규 계약이면 `null`. 갱신이면
+  - 빈도 — `claimCount`(총 건수), `avgClaimsPerYear`(연평균)
+  - 심도 — `totalIncurredKRW`(누적), `avgSeverityKRW`(건당 평균), `largestLossKRW`(최대 단일 손해)
+  - 손해율 — `lossRatioPercent` = 누적 발생손해액 ÷ `earnedPremiumKRW`(누적 경과보험료)
+  - `observedYears` — 관찰 기간(년)
+
+**표시 위치**
+- 속보 피드 카드: `신규계약` 배지 또는 `갱신 N회 · 손해율 XX%` 배지 (`policyBadgeHtml()`)
+- 상세 패널 계약 카드: 헤더에 `신규`/`갱신 N회` 필, 항목에 "계약 구분", 그 아래 **과거 손해 이력** 블록 (`lossHistoryHtml()`)
+- 손해율은 구간별로 색이 바뀝니다 — 50% 미만 양호(초록) / 50~80% 주의(주황) / 80% 이상 위험(빨강). 기준은 `lossRatioClass()`.
+- 신규 계약은 "삼성화재 인수 이력이 없어 과거 손해 데이터가 없습니다", 무사고 갱신 계약은 심도에 `—` / "무사고 기간"으로 표시됩니다.
+
+시뮬레이션으로 들어오는 신규 속보의 계약에도 같은 필드가 붙습니다 (`app.html`의 `maybeBuildContract()` / `buildLossHistory()`, 25% 확률로 신규 계약).
+
 ### 검토했다가 뺀 것: 이메일 자동 발송
 Resend API + GitHub Actions(10분 cron)로 실제 자동 메일 발송까지 구현했다가, 프로토타입 단계에 과하다고 판단해서 걷어냈습니다.
 나중에 다시 필요해지면 참고할 내용:
