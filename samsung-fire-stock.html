@@ -10,8 +10,8 @@
     --header-fill:#f3f2f1;
     --header-fill-active:#e2f0d9;
     --input-blue:#1155CC;
-    --up-red:#d32f2f;
-    --down-blue:#1565c0;
+    --up-profit:#1e7e34;
+    --down-loss:#d32f2f;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -79,7 +79,7 @@
   .rbtns .ricon.b{font-weight:bold;}
   .rbtns .ricon.i{font-style:italic;}
   .rbtns .ricon.u{text-decoration:underline;}
-  .swatch{width:14px;height:4px;background:var(--up-red);display:inline-block;margin-left:2px;}
+  .swatch{width:14px;height:4px;background:var(--up-profit);display:inline-block;margin-left:2px;}
 
   /* ---- formula bar ---- */
   .formulabar{
@@ -150,8 +150,8 @@
   .cell-calc{
     text-align:right;font-weight:bold;color:#000;background:#fffbea;
   }
-  .cell-calc.up{color:var(--up-red);}
-  .cell-calc.down{color:var(--down-blue);}
+  .cell-calc.up{color:var(--up-profit);}
+  .cell-calc.down{color:var(--down-loss);}
 
   /* ---- sheet tabs / status bar ---- */
   .sheettabs{
