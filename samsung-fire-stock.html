@@ -99,6 +99,7 @@
 
   /* ---- sheet ---- */
   .sheet-wrap{
+    position:relative;
     overflow:auto;
     height:calc(100vh - 168px);
     background:#fff;
@@ -152,6 +153,19 @@
   }
   .cell-calc.up{color:var(--up-profit);}
   .cell-calc.down{color:var(--down-loss);}
+  .cell-calc.neutral{color:#777;font-weight:normal;}
+
+  /* ---- floating chart object (엑셀 삽입 차트처럼 시트 위에 떠 있음) ---- */
+  .xl-chart{
+    position:absolute;
+    top:60px;left:635px;width:460px;
+    background:#fff;border:1px solid #b3b3b3;
+    box-shadow:2px 2px 8px rgba(0,0,0,.15);
+    padding:8px;z-index:5;
+  }
+  .xl-chart-title{font-size:12px;font-weight:bold;color:#333;margin-bottom:4px;}
+  .xl-chart-note{font-size:10px;color:#888;margin-top:4px;line-height:1.4;}
+  #priceChart{display:block;width:100%;height:auto;}
 
   /* ---- sheet tabs / status bar ---- */
   .sheettabs{
@@ -248,28 +262,36 @@
         </tr>
         <tr><th class="rownum">3</th>
           <td class="cell" data-addr="A3"></td><td class="cell" data-addr="B3"></td>
-          <td class="cell" data-addr="C3"></td><td class="cell" data-addr="D3"></td>
-          <td class="cell" data-addr="E3"></td><td class="cell" data-addr="F3"></td>
+          <td class="cell" data-addr="C3"></td>
+          <td class="cell cell-label strong" data-addr="D3">분기</td>
+          <td class="cell cell-label strong" data-addr="E3">종가 (원)</td>
+          <td class="cell" data-addr="F3"></td>
           <td class="cell" data-addr="G3"></td><td class="cell" data-addr="H3"></td>
         </tr>
         <tr><th class="rownum">4</th>
           <td class="cell cell-label" data-addr="A4">종목명</td>
           <td class="cell cell-label" data-addr="B4">삼성화재해상보험</td>
-          <td class="cell" data-addr="C4"></td><td class="cell" data-addr="D4"></td>
-          <td class="cell" data-addr="E4"></td><td class="cell" data-addr="F4"></td>
+          <td class="cell" data-addr="C4"></td>
+          <td class="cell cell-label" data-addr="D4">2020 Q1</td>
+          <td class="cell cell-input" data-addr="E4"><input id="in-q0" type="text" inputmode="numeric" value="148000"></td>
+          <td class="cell" data-addr="F4"></td>
           <td class="cell" data-addr="G4"></td><td class="cell" data-addr="H4"></td>
         </tr>
         <tr><th class="rownum">5</th>
           <td class="cell cell-label" data-addr="A5">종목코드</td>
           <td class="cell cell-label" data-addr="B5">000810</td>
-          <td class="cell" data-addr="C5"></td><td class="cell" data-addr="D5"></td>
-          <td class="cell" data-addr="E5"></td><td class="cell" data-addr="F5"></td>
+          <td class="cell" data-addr="C5"></td>
+          <td class="cell cell-label" data-addr="D5">2020 Q2</td>
+          <td class="cell cell-input" data-addr="E5"><input id="in-q1" type="text" inputmode="numeric" value="175000"></td>
+          <td class="cell" data-addr="F5"></td>
           <td class="cell" data-addr="G5"></td><td class="cell" data-addr="H5"></td>
         </tr>
         <tr><th class="rownum">6</th>
           <td class="cell" data-addr="A6"></td><td class="cell" data-addr="B6"></td>
-          <td class="cell" data-addr="C6"></td><td class="cell" data-addr="D6"></td>
-          <td class="cell" data-addr="E6"></td><td class="cell" data-addr="F6"></td>
+          <td class="cell" data-addr="C6"></td>
+          <td class="cell cell-label" data-addr="D6">2020 Q3</td>
+          <td class="cell cell-input" data-addr="E6"><input id="in-q2" type="text" inputmode="numeric" value="190000"></td>
+          <td class="cell" data-addr="F6"></td>
           <td class="cell" data-addr="G6"></td><td class="cell" data-addr="H6"></td>
         </tr>
         <tr><th class="rownum">7</th>
@@ -277,8 +299,10 @@
           <td class="cell cell-input" data-addr="B7" data-formula="입력값">
             <input id="in-buyPrice" type="text" inputmode="numeric" value="380000">
           </td>
-          <td class="cell" data-addr="C7"></td><td class="cell" data-addr="D7"></td>
-          <td class="cell" data-addr="E7"></td><td class="cell" data-addr="F7"></td>
+          <td class="cell" data-addr="C7"></td>
+          <td class="cell cell-label" data-addr="D7">2020 Q4</td>
+          <td class="cell cell-input" data-addr="E7"><input id="in-q3" type="text" inputmode="numeric" value="210000"></td>
+          <td class="cell" data-addr="F7"></td>
           <td class="cell" data-addr="G7"></td><td class="cell" data-addr="H7"></td>
         </tr>
         <tr><th class="rownum">8</th>
@@ -286,8 +310,10 @@
           <td class="cell cell-input" data-addr="B8" data-formula="입력값">
             <input id="in-qty" type="text" inputmode="numeric" value="10">
           </td>
-          <td class="cell" data-addr="C8"></td><td class="cell" data-addr="D8"></td>
-          <td class="cell" data-addr="E8"></td><td class="cell" data-addr="F8"></td>
+          <td class="cell" data-addr="C8"></td>
+          <td class="cell cell-label" data-addr="D8">2021 Q1</td>
+          <td class="cell cell-input" data-addr="E8"><input id="in-q4" type="text" inputmode="numeric" value="205000"></td>
+          <td class="cell" data-addr="F8"></td>
           <td class="cell" data-addr="G8"></td><td class="cell" data-addr="H8"></td>
         </tr>
         <tr><th class="rownum">9</th>
@@ -295,46 +321,93 @@
           <td class="cell cell-input" data-addr="B9" data-formula="입력값">
             <input id="in-curPrice" type="text" inputmode="numeric" value="415000">
           </td>
-          <td class="cell" data-addr="C9"></td><td class="cell" data-addr="D9"></td>
-          <td class="cell" data-addr="E9"></td><td class="cell" data-addr="F9"></td>
+          <td class="cell" data-addr="C9"></td>
+          <td class="cell cell-label" data-addr="D9">2021 Q2</td>
+          <td class="cell cell-input" data-addr="E9"><input id="in-q5" type="text" inputmode="numeric" value="215000"></td>
+          <td class="cell" data-addr="F9"></td>
           <td class="cell" data-addr="G9"></td><td class="cell" data-addr="H9"></td>
         </tr>
         <tr><th class="rownum">10</th>
           <td class="cell" data-addr="A10"></td><td class="cell" data-addr="B10"></td>
-          <td class="cell" data-addr="C10"></td><td class="cell" data-addr="D10"></td>
-          <td class="cell" data-addr="E10"></td><td class="cell" data-addr="F10"></td>
+          <td class="cell" data-addr="C10"></td>
+          <td class="cell cell-label" data-addr="D10">2021 Q3</td>
+          <td class="cell cell-input" data-addr="E10"><input id="in-q6" type="text" inputmode="numeric" value="195000"></td>
+          <td class="cell" data-addr="F10"></td>
           <td class="cell" data-addr="G10"></td><td class="cell" data-addr="H10"></td>
         </tr>
         <tr><th class="rownum">11</th>
           <td class="cell cell-label" data-addr="A11">매입금액 (원)</td>
           <td class="cell cell-calc" id="out-buyTotal" data-addr="B11" data-formula="=B7*B8">-</td>
-          <td class="cell" data-addr="C11"></td><td class="cell" data-addr="D11"></td>
-          <td class="cell" data-addr="E11"></td><td class="cell" data-addr="F11"></td>
+          <td class="cell" data-addr="C11"></td>
+          <td class="cell cell-label" data-addr="D11">2021 Q4</td>
+          <td class="cell cell-input" data-addr="E11"><input id="in-q7" type="text" inputmode="numeric" value="200000"></td>
+          <td class="cell" data-addr="F11"></td>
           <td class="cell" data-addr="G11"></td><td class="cell" data-addr="H11"></td>
         </tr>
         <tr><th class="rownum">12</th>
           <td class="cell cell-label" data-addr="A12">평가금액 (원)</td>
           <td class="cell cell-calc" id="out-evalTotal" data-addr="B12" data-formula="=B9*B8">-</td>
-          <td class="cell" data-addr="C12"></td><td class="cell" data-addr="D12"></td>
-          <td class="cell" data-addr="E12"></td><td class="cell" data-addr="F12"></td>
+          <td class="cell" data-addr="C12"></td>
+          <td class="cell cell-label" data-addr="D12">2022 Q1</td>
+          <td class="cell cell-input" data-addr="E12"><input id="in-q8" type="text" inputmode="numeric" value="220000"></td>
+          <td class="cell" data-addr="F12"></td>
           <td class="cell" data-addr="G12"></td><td class="cell" data-addr="H12"></td>
         </tr>
         <tr><th class="rownum">13</th>
           <td class="cell cell-label" data-addr="A13">평가손익 (원)</td>
           <td class="cell cell-calc" id="out-profitAmt" data-addr="B13" data-formula="=B12-B11">-</td>
-          <td class="cell" data-addr="C13"></td><td class="cell" data-addr="D13"></td>
-          <td class="cell" data-addr="E13"></td><td class="cell" data-addr="F13"></td>
+          <td class="cell" data-addr="C13"></td>
+          <td class="cell cell-label" data-addr="D13">2022 Q2</td>
+          <td class="cell cell-input" data-addr="E13"><input id="in-q9" type="text" inputmode="numeric" value="235000"></td>
+          <td class="cell" data-addr="F13"></td>
           <td class="cell" data-addr="G13"></td><td class="cell" data-addr="H13"></td>
         </tr>
         <tr><th class="rownum">14</th>
           <td class="cell cell-label" data-addr="A14">수익률 (%)</td>
           <td class="cell cell-calc" id="out-profitRate" data-addr="B14" data-formula="=(B13/B11)*100">-</td>
-          <td class="cell" data-addr="C14"></td><td class="cell" data-addr="D14"></td>
-          <td class="cell" data-addr="E14"></td><td class="cell" data-addr="F14"></td>
+          <td class="cell" data-addr="C14"></td>
+          <td class="cell cell-label" data-addr="D14">2022 Q3</td>
+          <td class="cell cell-input" data-addr="E14"><input id="in-q10" type="text" inputmode="numeric" value="245000"></td>
+          <td class="cell" data-addr="F14"></td>
           <td class="cell" data-addr="G14"></td><td class="cell" data-addr="H14"></td>
+        </tr>
+        <tr><th class="rownum">15</th>
+          <td class="cell cell-label strong" data-addr="A15">목표수익률 (%)</td>
+          <td class="cell cell-input" data-addr="B15" data-formula="입력값">
+            <input id="in-targetRate" type="text" inputmode="numeric" value="15">
+          </td>
+          <td class="cell" data-addr="C15"></td>
+          <td class="cell cell-label" data-addr="D15">2022 Q4</td>
+          <td class="cell cell-input" data-addr="E15"><input id="in-q11" type="text" inputmode="numeric" value="250000"></td>
+          <td class="cell" data-addr="F15"></td>
+          <td class="cell" data-addr="G15"></td><td class="cell" data-addr="H15"></td>
+        </tr>
+        <tr><th class="rownum">16</th>
+          <td class="cell cell-label" data-addr="A16">목표 달성률 (%)</td>
+          <td class="cell cell-calc" id="out-achieveRate" data-addr="B16" data-formula="=(B14/B15)*100">-</td>
+          <td class="cell" data-addr="C16"></td>
+          <td class="cell cell-label" data-addr="D16">2023 Q1</td>
+          <td class="cell cell-input" data-addr="E16"><input id="in-q12" type="text" inputmode="numeric" value="260000"></td>
+          <td class="cell" data-addr="F16"></td>
+          <td class="cell" data-addr="G16"></td><td class="cell" data-addr="H16"></td>
+        </tr>
+        <tr><th class="rownum">17</th>
+          <td class="cell cell-label" data-addr="A17">달성 여부</td>
+          <td class="cell cell-calc" id="out-achieveFlag" data-addr="B17" data-formula="=IF(B14&gt;=B15,&quot;달성&quot;,&quot;미달성&quot;)">-</td>
+          <td class="cell" data-addr="C17"></td>
+          <td class="cell cell-label" data-addr="D17">2023 Q2</td>
+          <td class="cell cell-input" data-addr="E17"><input id="in-q13" type="text" inputmode="numeric" value="275000"></td>
+          <td class="cell" data-addr="F17"></td>
+          <td class="cell" data-addr="G17"></td><td class="cell" data-addr="H17"></td>
         </tr>
       </tbody>
     </table>
+
+    <div class="xl-chart" id="xlChart">
+      <div class="xl-chart-title">📈 삼성화재(000810) 주가추이 — 분기별 (2020~2026)</div>
+      <canvas id="priceChart" width="440" height="230"></canvas>
+      <div class="xl-chart-note">※ E열의 분기별 종가는 예시 값입니다. 실제 종가로 수정하면 차트가 바로 반영됩니다.</div>
+    </div>
   </div>
 
   <div class="sheettabs">
@@ -352,20 +425,50 @@
   const COLS = ["A","B","C","D","E","F","G","H"];
   const body = document.getElementById("sheetBody");
 
-  // 나머지 빈 행(15~30)을 채워 실제 시트처럼 보이게 함
-  for (let r = 15; r <= 30; r++) {
+  // 2020 Q1 ~ 2026 Q3 (현재) 분기 목록. rows 18~30 은 여기서 나머지 분기(index 14~26)를 채운다.
+  const QUARTERS = [
+    {label:"2020 Q1", price:148000}, {label:"2020 Q2", price:175000},
+    {label:"2020 Q3", price:190000}, {label:"2020 Q4", price:210000},
+    {label:"2021 Q1", price:205000}, {label:"2021 Q2", price:215000},
+    {label:"2021 Q3", price:195000}, {label:"2021 Q4", price:200000},
+    {label:"2022 Q1", price:220000}, {label:"2022 Q2", price:235000},
+    {label:"2022 Q3", price:245000}, {label:"2022 Q4", price:250000},
+    {label:"2023 Q1", price:260000}, {label:"2023 Q2", price:275000},
+    {label:"2023 Q3", price:265000}, {label:"2023 Q4", price:290000},
+    {label:"2024 Q1", price:310000}, {label:"2024 Q2", price:330000},
+    {label:"2024 Q3", price:345000}, {label:"2024 Q4", price:360000},
+    {label:"2025 Q1", price:375000}, {label:"2025 Q2", price:390000},
+    {label:"2025 Q3", price:380000}, {label:"2025 Q4", price:400000},
+    {label:"2026 Q1", price:405000}, {label:"2026 Q2", price:410000},
+    {label:"2026 Q3", price:415000}
+  ];
+
+  // rows 4~17 은 위에 정적으로 이미 작성됨(index 0~13). 나머지 index 14~26 을 rows 18~30 에 채운다.
+  for (let r = 18; r <= 30; r++) {
+    const i = r - 4;
+    const q = QUARTERS[i];
     const tr = document.createElement("tr");
-    let html = `<th class="rownum">${r}</th>`;
-    COLS.forEach(c => html += `<td class="cell" data-addr="${c}${r}"></td>`);
-    tr.innerHTML = html;
+    tr.innerHTML =
+      `<th class="rownum">${r}</th>` +
+      `<td class="cell" data-addr="A${r}"></td>` +
+      `<td class="cell" data-addr="B${r}"></td>` +
+      `<td class="cell" data-addr="C${r}"></td>` +
+      `<td class="cell cell-label" data-addr="D${r}">${q.label}</td>` +
+      `<td class="cell cell-input" data-addr="E${r}"><input id="in-q${i}" type="text" inputmode="numeric" value="${q.price}"></td>` +
+      `<td class="cell" data-addr="F${r}"></td>` +
+      `<td class="cell" data-addr="G${r}"></td>` +
+      `<td class="cell" data-addr="H${r}"></td>`;
     body.appendChild(tr);
   }
+
+  const quarterInputs = QUARTERS.map((_, i) => document.getElementById("in-q" + i));
 
   // ---- 입력값 로드 ----
   const STORAGE_KEY = "samsungFireStockDashboard";
   const buyPriceEl = document.getElementById("in-buyPrice");
   const qtyEl = document.getElementById("in-qty");
   const curPriceEl = document.getElementById("in-curPrice");
+  const targetRateEl = document.getElementById("in-targetRate");
 
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -373,6 +476,10 @@
       buyPriceEl.value = saved.buyPrice ?? buyPriceEl.value;
       qtyEl.value = saved.qty ?? qtyEl.value;
       curPriceEl.value = saved.curPrice ?? curPriceEl.value;
+      targetRateEl.value = saved.targetRate ?? targetRateEl.value;
+      if (Array.isArray(saved.quarterPrices) && saved.quarterPrices.length === quarterInputs.length) {
+        saved.quarterPrices.forEach((v, i) => { quarterInputs[i].value = v; });
+      }
     }
   } catch (e) {}
 
@@ -387,40 +494,126 @@
     return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
   }
 
+  function saveAll(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        buyPrice: buyPriceEl.value, qty: qtyEl.value, curPrice: curPriceEl.value,
+        targetRate: targetRateEl.value,
+        quarterPrices: quarterInputs.map(inp => inp.value)
+      }));
+    } catch (e) {}
+  }
+
   const outBuyTotal = document.getElementById("out-buyTotal");
   const outEvalTotal = document.getElementById("out-evalTotal");
   const outProfitAmt = document.getElementById("out-profitAmt");
   const outProfitRate = document.getElementById("out-profitRate");
+  const outAchieveRate = document.getElementById("out-achieveRate");
+  const outAchieveFlag = document.getElementById("out-achieveFlag");
 
   function recalc(){
     const buyPrice = toNumber(buyPriceEl.value);
     const qty = toNumber(qtyEl.value);
     const curPrice = toNumber(curPriceEl.value);
+    const targetRate = toNumber(targetRateEl.value);
 
     const buyTotal = buyPrice * qty;
     const evalTotal = curPrice * qty;
     const profitAmt = evalTotal - buyTotal;
     const profitRate = buyTotal !== 0 ? (profitAmt / buyTotal) * 100 : 0;
+    const achieveRate = targetRate !== 0 ? (profitRate / targetRate) * 100 : 0;
+    const achieved = targetRate !== 0 && profitRate >= targetRate;
 
     outBuyTotal.textContent = won(buyTotal);
     outEvalTotal.textContent = won(evalTotal);
     outProfitAmt.textContent = won(profitAmt);
     outProfitRate.textContent = pct(profitRate);
+    outAchieveRate.textContent = achieveRate.toFixed(1) + "%";
+    outAchieveFlag.textContent = achieved ? "달성 ✔" : "미달성";
 
     [outProfitAmt, outProfitRate].forEach(el => {
       el.classList.remove("up", "down");
       el.classList.add(profitAmt >= 0 ? "up" : "down");
     });
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        buyPrice: buyPriceEl.value, qty: qtyEl.value, curPrice: curPriceEl.value
-      }));
-    } catch (e) {}
+    outAchieveRate.classList.toggle("up", achieved);
+    outAchieveFlag.classList.toggle("up", achieved);
+    outAchieveFlag.classList.toggle("neutral", !achieved);
+
+    saveAll();
   }
 
-  [buyPriceEl, qtyEl, curPriceEl].forEach(el => el.addEventListener("input", recalc));
+  [buyPriceEl, qtyEl, curPriceEl, targetRateEl].forEach(el => el.addEventListener("input", recalc));
+
+  // ---- 분기별 주가추이 차트 ----
+  const chartCanvas = document.getElementById("priceChart");
+  const chartCtx = chartCanvas.getContext("2d");
+
+  function drawChart(){
+    const w = chartCanvas.width, h = chartCanvas.height;
+    chartCtx.clearRect(0, 0, w, h);
+
+    const prices = quarterInputs.map(inp => toNumber(inp.value));
+    const padL = 46, padR = 10, padT = 10, padB = 22;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const range = (maxP - minP) || 1;
+    const yFor = p => padT + plotH - ((p - minP) / range) * plotH;
+    const xFor = i => padL + (i / (prices.length - 1)) * plotW;
+
+    chartCtx.font = "9px Calibri, sans-serif";
+    chartCtx.strokeStyle = "#e8e8e8";
+    chartCtx.fillStyle = "#888";
+    const steps = 4;
+    for (let s = 0; s <= steps; s++) {
+      const val = minP + (range * s / steps);
+      const y = yFor(val);
+      chartCtx.beginPath();
+      chartCtx.moveTo(padL, y);
+      chartCtx.lineTo(w - padR, y);
+      chartCtx.stroke();
+      chartCtx.fillText(Math.round(val).toLocaleString("ko-KR"), 2, y + 3);
+    }
+
+    chartCtx.fillStyle = "#666";
+    QUARTERS.forEach((q, i) => {
+      if (q.label.endsWith("Q1") || i === QUARTERS.length - 1) {
+        chartCtx.fillText(q.label.slice(0, 4), xFor(i) - 10, h - 6);
+      }
+    });
+
+    chartCtx.beginPath();
+    prices.forEach((p, i) => {
+      const x = xFor(i), y = yFor(p);
+      if (i === 0) chartCtx.moveTo(x, y); else chartCtx.lineTo(x, y);
+    });
+    chartCtx.strokeStyle = "#1155CC";
+    chartCtx.lineWidth = 2;
+    chartCtx.stroke();
+
+    prices.forEach((p, i) => {
+      const x = xFor(i), y = yFor(p);
+      chartCtx.beginPath();
+      chartCtx.arc(x, y, i === prices.length - 1 ? 3 : 2, 0, Math.PI * 2);
+      chartCtx.fillStyle = i === prices.length - 1 ? "#d32f2f" : "#1155CC";
+      chartCtx.fill();
+    });
+
+    const lastX = xFor(prices.length - 1), lastY = yFor(prices[prices.length - 1]);
+    chartCtx.fillStyle = "#d32f2f";
+    chartCtx.font = "bold 10px Calibri, sans-serif";
+    chartCtx.fillText(Math.round(prices[prices.length - 1]).toLocaleString("ko-KR") + "원", Math.min(lastX - 40, w - 70), lastY - 8);
+  }
+
+  quarterInputs.forEach(inp => {
+    inp.addEventListener("input", () => { saveAll(); drawChart(); });
+  });
+
   recalc();
+  drawChart();
 
   // ---- 셀 선택 / 수식 입력줄 연동 ----
   const cellRef = document.getElementById("cellRef");
@@ -468,7 +661,7 @@
   selectCell(document.querySelector('[data-addr="B7"]'));
 
   // Enter 입력 시 엑셀처럼 아래 셀(다음 입력칸)로 이동
-  const inputOrder = [buyPriceEl, qtyEl, curPriceEl];
+  const inputOrder = [buyPriceEl, qtyEl, curPriceEl, targetRateEl];
   inputOrder.forEach((el, idx) => {
     el.addEventListener("keydown", e => {
       if (e.key === "Enter") {
