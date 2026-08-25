@@ -257,6 +257,24 @@
   .ap-item.sent .ap-state{ background:var(--success-soft); color:var(--success); }
   .ap-item.pending .ap-state{ background:var(--warning-soft); color:var(--warning); }
 
+  /* ---------- date filter ---------- */
+  .date-filter{ display:flex; flex-direction:column; gap:7px; }
+  .date-presets{ display:flex; gap:5px; flex-wrap:wrap; }
+  .chip{
+    font-family:inherit; font-size:11.5px; color:var(--ink-dim); cursor:pointer;
+    background:var(--surface); border:1px solid var(--border); border-radius:99px;
+    padding:4px 10px; white-space:nowrap;
+  }
+  .chip:hover{ background:var(--surface-2); }
+  .chip.active{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .date-range{ display:flex; align-items:center; gap:5px; }
+  .date-range input[type="date"]{
+    font-family:inherit; font-size:12px; color:var(--ink); flex:1; min-width:0;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:5px 7px;
+  }
+  .date-sep{ color:var(--ink-faint); font-size:12px; flex:none; }
+  .date-summary{ font-size:11.5px; color:var(--ink-faint); min-height:15px; }
+
   .filters{ display:flex; flex-direction:column; gap:8px; }
   .filter-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   select, input[type="text"], input[type="search"], textarea{
@@ -448,7 +466,7 @@
   <div class="summary">
     <div class="card">
       <div class="num" id="statTotal">0</div>
-      <div class="label">진행 중인 사고 (24시간)</div>
+      <div class="label">표시 중인 사고</div>
     </div>
     <div class="card">
       <div class="num danger" id="statMatched">0</div>
@@ -487,6 +505,21 @@
         </div>
         <div class="filter-row">
           <div class="search-wrap"><input type="search" id="filterSearch" placeholder="사고 제목·지역·업체명 검색"></div>
+        </div>
+        <div class="date-filter">
+          <div class="date-presets" id="datePresets">
+            <button class="chip active" data-preset="all">전체</button>
+            <button class="chip" data-preset="today">오늘</button>
+            <button class="chip" data-preset="3d">최근 3일</button>
+            <button class="chip" data-preset="7d">최근 7일</button>
+          </div>
+          <div class="date-range">
+            <input type="date" id="filterDateFrom" aria-label="시작일">
+            <span class="date-sep">~</span>
+            <input type="date" id="filterDateTo" aria-label="종료일">
+            <button class="btn ghost small" id="btnDateClear" title="날짜 조건 해제">✕</button>
+          </div>
+          <div class="date-summary" id="dateSummary"></div>
         </div>
         <div class="filter-row">
           <label class="toggle" id="toggleMatchedOnly"><input type="checkbox" id="chkMatchedOnly"><span>삼성화재 관련만 보기</span></label>
@@ -555,7 +588,7 @@ let RAW_TEMPLATE = null;
 let ARTIFACT = null;
 let CAN_WRITE = true;
 let liveTimer = null;
-let uiFilters = { type:"all", stage:"all", search:"", matchedOnly:false, unreviewedOnly:false };
+let uiFilters = { type:"all", stage:"all", search:"", matchedOnly:false, unreviewedOnly:false, dateFrom:"", dateTo:"" };
 let openDetailId = null;
 
 function loadInitialState(){
@@ -704,6 +737,10 @@ function applyFilters(list){
     if(uiFilters.stage !== "all" && STAGE_GROUP.group(inc.responseStage) !== uiFilters.stage) return false;
     if(uiFilters.matchedOnly && !(inc.samsungMatch && inc.samsungMatch.matched)) return false;
     if(uiFilters.unreviewedOnly && inc.workflow.reviewed) return false;
+    // occurredAt은 "YYYY-MM-DDTHH:MM:SS" 이라 앞 10자리를 그대로 문자열 비교하면 된다
+    const day = inc.occurredAt.slice(0,10);
+    if(uiFilters.dateFrom && day < uiFilters.dateFrom) return false;
+    if(uiFilters.dateTo && day > uiFilters.dateTo) return false;
     if(uiFilters.search){
       const q = uiFilters.search.toLowerCase();
       const hay = (inc.title + " " + inc.location.region + " " + inc.location.address + " " + inc.relatedEntity.name).toLowerCase();
@@ -711,6 +748,74 @@ function applyFilters(list){
     }
     return true;
   });
+}
+
+/* ---------------- date filter ---------------- */
+
+function toDayStr(d){
+  const pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+// 데이터 기준의 "오늘". 더미 데이터는 과거/미래 날짜로 고정돼 있으므로
+// 실제 시계가 아니라 가장 최근 사고 날짜를 기준으로 삼아야 프리셋이 의미를 갖는다.
+function dataToday(){
+  let max = "";
+  for(const inc of STATE.incidents){
+    const d = inc.occurredAt.slice(0,10);
+    if(d > max) max = d;
+  }
+  return max || toDayStr(new Date());
+}
+
+function shiftDays(dayStr, delta){
+  const [y,m,d] = dayStr.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate() + delta);
+  return toDayStr(dt);
+}
+
+function applyDatePreset(preset){
+  const today = dataToday();
+  if(preset === "all"){ uiFilters.dateFrom = ""; uiFilters.dateTo = ""; }
+  else if(preset === "today"){ uiFilters.dateFrom = today; uiFilters.dateTo = today; }
+  else if(preset === "3d"){ uiFilters.dateFrom = shiftDays(today,-2); uiFilters.dateTo = today; }
+  else if(preset === "7d"){ uiFilters.dateFrom = shiftDays(today,-6); uiFilters.dateTo = today; }
+  syncDateInputs();
+  markActivePreset(preset);
+  render();
+}
+
+function syncDateInputs(){
+  document.getElementById("filterDateFrom").value = uiFilters.dateFrom;
+  document.getElementById("filterDateTo").value = uiFilters.dateTo;
+}
+
+// 현재 from/to 조합이 어떤 프리셋과 같은지 되짚어서 칩 상태를 맞춘다
+function detectPreset(){
+  const {dateFrom:f, dateTo:t} = uiFilters;
+  if(!f && !t) return "all";
+  const today = dataToday();
+  if(t !== today) return null;
+  if(f === today) return "today";
+  if(f === shiftDays(today,-2)) return "3d";
+  if(f === shiftDays(today,-6)) return "7d";
+  return null;
+}
+
+function markActivePreset(preset){
+  document.querySelectorAll("#datePresets .chip").forEach(el => {
+    el.classList.toggle("active", el.dataset.preset === preset);
+  });
+}
+
+function renderDateSummary(list){
+  const el = document.getElementById("dateSummary");
+  const {dateFrom:f, dateTo:t} = uiFilters;
+  if(!f && !t){ el.textContent = ""; return; }
+  const days = new Set(list.map(i => i.occurredAt.slice(0,10)));
+  const label = f && t ? (f === t ? f : `${f} ~ ${t}`) : (f ? `${f} 이후` : `${t} 이전`);
+  el.textContent = `${label} · ${list.length}건 (${days.size}일)`;
 }
 
 /* ---------------- rendering: feed ---------------- */
@@ -768,8 +873,7 @@ function feedCardHtml(inc){
 
 /* ---------------- rendering: summary ---------------- */
 
-function renderSummary(){
-  const all = STATE.incidents;
+function renderSummary(all){
   const matched = all.filter(i => i.samsungMatch && i.samsungMatch.matched);
   const unreviewed = matched.filter(i => !i.workflow.reviewed);
   const casualty = all.reduce((s,i) => s + i.casualties.dead + i.casualties.injured, 0);
@@ -779,9 +883,9 @@ function renderSummary(){
   document.getElementById("statCasualty").textContent = casualty;
 }
 
-function renderAlertPanel(){
+function renderAlertPanel(list){
   // 삼성화재 연관 사고만 대상. 발송 대기(미검토) 건을 위로 올려서 보여준다.
-  const targets = STATE.incidents.filter(i => i.samsungMatch && i.samsungMatch.matched);
+  const targets = list.filter(i => i.samsungMatch && i.samsungMatch.matched);
   const rows = targets.map(inc => {
     const uw = (inc.samsungMatch.contracts[0] || {}).underwriter || null;
     const sent = inc.workflow.alertSent;
@@ -797,12 +901,12 @@ function renderAlertPanel(){
   document.getElementById("alertPanelCount").textContent =
     rows.length ? `발송 ${sentCount} · 대기 ${rows.length - sentCount}` : "";
 
-  const list = document.getElementById("alertPanelList");
+  const listEl = document.getElementById("alertPanelList");
   if(!rows.length){
-    list.innerHTML = `<div class="ap-empty">알림 대상 사고가 없습니다.</div>`;
+    listEl.innerHTML = `<div class="ap-empty">알림 대상 사고가 없습니다.</div>`;
     return;
   }
-  list.innerHTML = rows.map(r => `
+  listEl.innerHTML = rows.map(r => `
     <div class="ap-item ${r.sent ? "sent" : "pending"}" data-id="${escapeHtml(r.inc.id)}">
       <span class="ap-dot"></span>
       <div class="ap-body">
@@ -814,7 +918,7 @@ function renderAlertPanel(){
     </div>
   `).join("");
 
-  list.querySelectorAll(".ap-item").forEach(el => {
+  listEl.querySelectorAll(".ap-item").forEach(el => {
     el.addEventListener("click", () => openDetail(el.dataset.id));
   });
 }
@@ -1067,12 +1171,13 @@ function showToast(text, critical){
 /* ---------------- main render ---------------- */
 
 function render(){
-  renderSummary();
   updateLastUpdatedPill();
   const filtered = applyFilters(STATE.incidents);
+  renderSummary(filtered);
+  renderDateSummary(filtered);
   renderPins(filtered);
   renderFeed(filtered);
-  renderAlertPanel();
+  renderAlertPanel(filtered);
   if(openDetailId) renderDetail();
 }
 
@@ -1253,6 +1358,20 @@ function wireEvents(){
     document.getElementById("toggleUnreviewedOnly").classList.toggle("active", e.target.checked);
     render();
   });
+  document.querySelectorAll("#datePresets .chip").forEach(el => {
+    el.addEventListener("click", () => applyDatePreset(el.dataset.preset));
+  });
+  document.getElementById("filterDateFrom").addEventListener("change", e => {
+    uiFilters.dateFrom = e.target.value;
+    markActivePreset(detectPreset());
+    render();
+  });
+  document.getElementById("filterDateTo").addEventListener("change", e => {
+    uiFilters.dateTo = e.target.value;
+    markActivePreset(detectPreset());
+    render();
+  });
+  document.getElementById("btnDateClear").addEventListener("click", () => applyDatePreset("all"));
   document.getElementById("btnSimulate").addEventListener("click", () => triggerNewIncident(true));
   document.getElementById("btnToggleLive").addEventListener("click", () => { liveActive = !liveActive; setLivePillState(); });
   document.getElementById("scrim").addEventListener("click", closeDetail);

@@ -324,7 +324,7 @@ incidents.append(incident(
     occurredAt="2026-08-25T05:50:00",
     title="전주 재래시장 점포 화재",
     itype="화재", industry="상업시설",
-    address="전라북도 전주시 재래시장", region="전라북도", lat=35.8242, lng=127.1480,
+    address="전북특별자치도 전주시 재래시장", region="전북특별자치도", lat=35.8242, lng=127.1480,
     dead=0, injured=0, missing=0,
     lossType="분손", estimatedLossKRW=180000000, damageNote="점포 3칸 소실",
     stage="진화완료", history=stage_history([
@@ -363,9 +363,251 @@ incidents.append(incident(
     alertLog=alert_log("2026-08-25T02:31:00", "윤서준 부장", "seojun.yoon@dummy-samsungfire.example"),
 ))
 
+# ---------------------------------------------------------------------------
+# 대량 더미 사고 생성 — 지도를 채우고 날짜 필터를 쓸 수 있을 만큼의 물량.
+# 시드를 고정해서 다시 돌려도 같은 결과가 나오게 한다.
+# ---------------------------------------------------------------------------
+import random
+from datetime import datetime, timedelta
+
+rng = random.Random(20260825)
+
+# 17개 시도 전역 좌표 풀 (시군구 단위, 실제 대략 좌표)
+SPOTS = [
+    ("서울특별시", "강서구", 37.5590, 126.8300),
+    ("서울특별시", "성동구", 37.5445, 127.0557),
+    ("서울특별시", "금천구", 37.4790, 126.8827),
+    ("부산광역시", "사상구", 35.1533, 128.9910),
+    ("부산광역시", "강서구", 35.0960, 128.8560),
+    ("부산광역시", "동구", 35.1160, 129.0420),
+    ("대구광역시", "달서구", 35.8380, 128.5090),
+    ("대구광역시", "북구", 35.9010, 128.5980),
+    ("인천광역시", "남동구", 37.4020, 126.7180),
+    ("인천광역시", "중구", 37.4600, 126.6200),
+    ("광주광역시", "광산구", 35.1750, 126.7900),
+    ("대전광역시", "대덕구", 36.4080, 127.4300),
+    ("울산광역시", "남구", 35.5210, 129.3520),
+    ("울산광역시", "동구", 35.5040, 129.4260),
+    ("세종특별자치시", "전동면", 36.6260, 127.2800),
+    ("경기도", "평택시", 36.9930, 126.8420),
+    ("경기도", "안산시", 37.3040, 126.8300),
+    ("경기도", "이천시", 37.2720, 127.4350),
+    ("경기도", "파주시", 37.7130, 126.6980),
+    ("경기도", "용인시", 37.2410, 127.1780),
+    ("강원특별자치도", "원주시", 37.3180, 127.8180),
+    ("강원특별자치도", "강릉시", 37.6120, 129.0350),
+    ("강원특별자치도", "동해시", 37.4900, 129.1180),
+    ("충청북도", "청주시", 36.7180, 127.4310),
+    ("충청북도", "음성군", 36.9560, 127.5340),
+    ("충청북도", "충주시", 36.9700, 127.9300),
+    ("충청남도", "아산시", 36.7830, 127.0640),
+    ("충청남도", "서산시", 37.0060, 126.4020),
+    ("충청남도", "논산시", 36.1870, 127.0990),
+    ("전북특별자치도", "군산시", 35.9640, 126.6400),
+    ("전북특별자치도", "익산시", 35.9480, 126.9570),
+    ("전라남도", "광양시", 34.9400, 127.7000),
+    ("전라남도", "순천시", 34.9200, 127.5300),
+    ("전라남도", "나주시", 35.0180, 126.7900),
+    ("경상북도", "구미시", 36.1140, 128.3480),
+    ("경상북도", "경주시", 35.7700, 129.2700),
+    ("경상북도", "김천시", 36.1200, 128.1180),
+    ("경상남도", "김해시", 35.2340, 128.8100),
+    ("경상남도", "양산시", 35.3400, 129.0080),
+    ("경상남도", "사천시", 35.0030, 128.0640),
+    ("제주특별자치도", "제주시", 33.4630, 126.3300),
+    ("제주특별자치도", "서귀포시", 33.2540, 126.5600),
+]
+
+# 업종에 맞는 장소 표현 — 아파트 화재가 "항공산업단지"에서 나는 일이 없게 한다
+PLACE_BY_INDUSTRY = {
+    "물류창고": "물류단지",
+    "제조공장": "산업단지",
+    "화학공장": "석유화학단지",
+    "상업시설": "상가밀집지역",
+    "공동주택": "아파트단지",
+    "건설현장": "신축공사장",
+    "발전/에너지": "발전단지",
+    "여객운송": "국도변",
+    "화물운송": "고속도로 나들목 인근",
+}
+
+# (사고유형, 업종, 제목템플릿) — 유형과 업종이 어울리게 묶는다
+TEMPLATES = [
+    ("화재", "물류창고", "{loc} 물류창고 화재"),
+    ("화재", "제조공장", "{loc} 제조공장 화재"),
+    ("화재", "상업시설", "{loc} 상가건물 화재"),
+    ("화재", "공동주택", "{loc} 아파트 화재"),
+    ("화재", "발전/에너지", "{loc} 발전설비 화재"),
+    ("폭발", "화학공장", "{loc} 화학공장 폭발"),
+    ("폭발", "제조공장", "{loc} 공장 집진설비 폭발"),
+    ("붕괴", "건설현장", "{loc} 건설현장 붕괴"),
+    ("붕괴", "상업시설", "{loc} 노후건물 외벽 붕괴"),
+    ("수재", "제조공장", "{loc} 공장 침수"),
+    ("수재", "물류창고", "{loc} 물류창고 침수"),
+    ("교통사고", "여객운송", "{loc} 버스 추돌 사고"),
+    ("교통사고", "화물운송", "{loc} 화물차 전도 사고"),
+]
+
+ENTITY_SUFFIX = ["로지스", "산업", "테크", "머티리얼즈", "케미칼", "정밀", "물산", "이엔지", "코퍼레이션", "에너지"]
+ENTITY_PREFIX = ["대한", "한성", "동진", "세명", "우성", "삼우", "신라", "태창", "금호", "청우", "はな".replace("はな","한별"), "성진"]
+UWS = [
+    ("김도윤 과장", "02-1234-5601", "doyoon.kim@dummy-samsungfire.example"),
+    ("이서연 대리", "02-1234-5622", "seoyeon.lee@dummy-samsungfire.example"),
+    ("박지훈 차장", "02-1234-5633", "jihoon.park@dummy-samsungfire.example"),
+    ("최민석 부장", "02-1234-5644", "minseok.choi@dummy-samsungfire.example"),
+    ("정하은 과장", "02-1234-5655", "haeun.jung@dummy-samsungfire.example"),
+    ("한지민 차장", "02-1234-5666", "jimin.han@dummy-samsungfire.example"),
+    ("오세훈 대리", "02-1234-5677", "sehoon.oh@dummy-samsungfire.example"),
+    ("윤서준 부장", "02-1234-5688", "seojun.yoon@dummy-samsungfire.example"),
+]
+PRODUCTS = ["재산종합보험(패키지)", "화재보험(재산종합)", "기업종합위험보험", "건설공사보험(CAR)",
+            "시설물배상책임보험", "건물종합보험", "재산종합보험(기업휴지 포함)"]
+PARTNERS = ["DB손해보험", "현대해상", "KB손해보험", "메리츠화재", "한화손해보험", "롯데손해보험", "흥국화재"]
+SOURCES = ["연합뉴스 (더미)", "YTN (더미)", "뉴시스 (더미)", "MBC (더미)", "KBS (더미)", "지역일보 (더미)"]
+
+STAGE_SEQ = {
+    "화재": ["신고접수", "소방출동", "진압중", "진화완료", "원인조사", "후속조치"],
+    "폭발": ["신고접수", "소방·화학구조대출동", "진압/수습", "주민대피", "환경영향조사", "후속조치"],
+    "붕괴": ["신고접수", "구조대출동", "구조/수습", "현장통제", "정밀안전진단", "후속조치"],
+    "수재": ["침수신고", "배수작업", "응급복구", "피해조사", "후속조치"],
+    "교통사고": ["신고접수", "구급대출동", "구조/이송", "현장정리", "후속조치"],
+}
+
+BASE_DAY = datetime(2026, 8, 25, 9, 0, 0)   # 데이터 기준 "현재"
+
+def gen_bulk(n, start_seq):
+    """최근 14일에 걸쳐 사고 n건을 생성한다."""
+    out = []
+    for k in range(n):
+        region, city, lat, lng = rng.choice(SPOTS)
+        itype, industry, title_tpl = rng.choice(TEMPLATES)
+        address = f"{region} {city} {PLACE_BY_INDUSTRY[industry]}"
+
+        # 좌표를 살짝 흩어서 같은 지점에 핀이 겹치지 않게
+        lat = round(lat + rng.uniform(-0.06, 0.06), 4)
+        lng = round(lng + rng.uniform(-0.06, 0.06), 4)
+
+        # 최근 14일 안에서 시각을 뽑되, 최근일수록 조금 더 촘촘하게
+        days_ago = min(13, int(abs(rng.gauss(0, 5))))
+        occurred = BASE_DAY - timedelta(days=days_ago,
+                                        hours=rng.randint(0, 23),
+                                        minutes=rng.choice([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]))
+        if occurred > BASE_DAY:
+            occurred = BASE_DAY - timedelta(minutes=30)
+        occ_iso = occurred.strftime("%Y-%m-%dT%H:%M:00")
+
+        title = title_tpl.format(loc=city)
+
+        # 오래된 사고일수록 대응단계가 더 진행돼 있다
+        seq = STAGE_SEQ[itype]
+        max_idx = min(len(seq) - 1, 1 + days_ago)
+        stage_idx = rng.randint(1, max_idx) if max_idx >= 1 else 0
+        offsets, acc = [], 0
+        for i in range(stage_idx + 1):
+            acc += 0 if i == 0 else rng.randint(5, 240) * (1 if i < 3 else 4)
+            offsets.append((seq[i], acc))
+        history = stage_history(offsets, occ_iso)
+
+        # 인명피해 — 유형별로 규모를 다르게
+        if itype == "폭발":
+            dead, injured = rng.choice([0, 0, 1, 2, 3]), rng.randint(0, 18)
+        elif itype == "붕괴":
+            dead, injured = rng.choice([0, 0, 1, 2]), rng.randint(0, 9)
+        elif itype == "교통사고":
+            dead, injured = rng.choice([0, 0, 0, 1]), rng.randint(2, 22)
+        elif itype == "수재":
+            dead, injured = 0, rng.randint(0, 4)
+        else:
+            dead, injured = rng.choice([0, 0, 0, 1, 2]), rng.randint(0, 12)
+        missing = rng.choice([0, 0, 0, 0, 1])
+
+        # 재산피해
+        if itype == "교통사고":
+            loss_type, loss = "해당없음", None
+        else:
+            loss_type = rng.choice(["분손", "분손(추정중)", "분손", "전손 추정"])
+            scale = {"화재": 40, "폭발": 90, "붕괴": 15, "수재": 30}[itype]
+            loss = rng.randint(2, scale) * 100000000
+        note = {
+            "화재": "건물 일부 소실, 세부 피해규모 확인 중",
+            "폭발": "설비 파손 및 인근 시설 손상, 원인 조사 중",
+            "붕괴": "구조물 일부 붕괴, 안전진단 진행 중",
+            "수재": "집중호우로 설비·재고 침수, 배수 및 복구 중",
+            "교통사고": "차량 파손 및 다수 부상자 발생",
+        }[itype]
+
+        entity = f"㈜{rng.choice(ENTITY_PREFIX)}{rng.choice(ENTITY_SUFFIX)}"
+        biz = f"{rng.randint(100,699)}-8{rng.randint(1,9)}-{rng.randint(1,9)}XXXX"
+
+        # 약 45%가 삼성화재 계약과 매칭
+        matched = rng.random() < 0.45
+        contracts = []
+        confidence = "낮음"
+        if matched:
+            confidence = rng.choice(["높음", "높음", "중간", "중간", "낮음(재확인 필요)"])
+            is_new = rng.random() < 0.22
+            since = None if is_new else rng.randint(2009, 2024)
+            renewals = 0 if is_new else 2026 - since
+            lh = None
+            past = 0
+            if not is_new:
+                claims = rng.choice([0, 0, 1, 1, 2, 2, 3, 4, 5])
+                premium = rng.randint(5, 700) * 100000000
+                incurred = int(premium * rng.randint(8, 105) / 100) if claims else 0
+                largest = int(incurred * rng.uniform(0.45, 0.92)) if claims else 0
+                lh = loss_history(renewals, claims, incurred, largest, premium)
+                past = claims
+            held_pct = rng.randint(15, 100)
+            partner = rng.choice(PARTNERS)
+            coins = ([{"company": "삼성화재", "percent": held_pct}]
+                     if held_pct == 100 else
+                     [{"company": "삼성화재", "percent": held_pct},
+                      {"company": partner, "percent": 100 - held_pct}])
+            sum_insured = rng.randint(10, 1500) * 100000000
+            uw = rng.choice(UWS)
+            contracts = [contract(
+                f"SF-{rng.randint(2024,2026)}-{rng.choice(['FR','PK','CL','CR','EG','BD'])}-{rng.randint(100000,999999)}",
+                rng.choice(PRODUCTS), entity,
+                f"{rng.randint(2025,2026)}-{rng.randint(1,12):02d}-01",
+                f"{rng.randint(2026,2027)}-{rng.randint(1,12):02d}-28", "유효",
+                True, held_pct, sum_insured, sum_insured,
+                sum_insured if rng.random() < 0.5 else None, None, sum_insured,
+                rng.randint(1, 20) * 100000000, rng.randint(0, 50), past,
+                coins, uw[0], uw[1], uw[2],
+                isNew=is_new, sinceYear=since, renewalCount=renewals, lossHistory=lh)]
+
+        # 매칭 건 중 일부는 이미 알림이 나갔고 일부는 검토도 끝났다
+        alert_sent, alerts, reviewed, reviewed_by, reviewed_at = False, [], False, None, None
+        if matched and days_ago >= 1 and rng.random() < 0.6:
+            alert_sent = True
+            at = (occurred + timedelta(minutes=rng.randint(12, 90))).strftime("%Y-%m-%dT%H:%M:00")
+            uw = contracts[0]["underwriter"]
+            alerts = alert_log(at, uw["name"], uw["email"])
+            if rng.random() < 0.5:
+                reviewed = True
+                reviewed_by = rng.choice(["기업보상팀 김주임", "기업보상팀 이대리", "손사팀 박과장"])
+                reviewed_at = (occurred + timedelta(hours=rng.randint(2, 30))).strftime("%Y-%m-%dT%H:%M:00")
+
+        out.append(incident(
+            id=f"INC-{occurred.strftime('%Y%m%d')}-{start_seq + k:03d}",
+            occurredAt=occ_iso, title=title, itype=itype, industry=industry,
+            address=address, region=region, lat=lat, lng=lng,
+            dead=dead, injured=injured, missing=missing,
+            lossType=loss_type, estimatedLossKRW=loss, damageNote=note,
+            stage=history[-1]["stage"], history=history,
+            sourceNote=rng.choice(SOURCES), entityName=entity, bizRegNo=biz,
+            matched=matched, confidence=confidence, contracts=contracts,
+            reviewed=reviewed, reviewedBy=reviewed_by, reviewedAt=reviewed_at,
+            alertSent=alert_sent, alertLog=alerts,
+        ))
+    return out
+
+incidents.extend(gen_bulk(76, 100))
+incidents.sort(key=lambda i: i["occurredAt"], reverse=True)
+
 state = {
     "lastUpdated": "2026-08-25T09:00:00",
-    "nextSeq": 13,
+    "nextSeq": 200,
     "alertsUnread": 3,
     "incidents": incidents,
 }
