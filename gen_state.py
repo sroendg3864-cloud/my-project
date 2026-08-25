@@ -55,7 +55,8 @@ def incident(id, occurredAt, title, itype, industry, address, region, lat, lng,
              dead, injured, missing, lossType, estimatedLossKRW, damageNote,
              stage, history, sourceNote, entityName, bizRegNo,
              matched, confidence, contracts, reviewed=False, reviewedBy=None, reviewedAt=None,
-             assignedTo=None, notes=None, alertSent=False, alertLog=None):
+             assignedTo=None, notes=None, alertSent=False, alertLog=None,
+             lifecycle=None):
     return {
         "id": id,
         "occurredAt": occurredAt,
@@ -70,6 +71,11 @@ def incident(id, occurredAt, title, itype, industry, address, region, lat, lng,
         "sourceNote": sourceNote,
         "relatedEntity": {"name": entityName, "bizRegNo": bizRegNo},
         "samsungMatch": {"matched": matched, "confidence": confidence, "contracts": contracts},
+        # 조치완료 + (연관건이면) 보험금 지급완료 => 종결. 종결되면 지도/피드에서 빠지고 이력에만 남는다.
+        "lifecycle": lifecycle or {
+            "actionCompleted": False, "actionCompletedAt": None,
+            "claimPaid": False, "claimPaidAt": None, "claimAmountKRW": None,
+        },
         "workflow": {
             "reviewed": reviewed, "reviewedBy": reviewedBy, "reviewedAt": reviewedAt,
             "assignedTo": assignedTo, "notes": notes or [], "alertSent": alertSent,
@@ -588,6 +594,31 @@ def gen_bulk(n, start_seq):
                 reviewed_by = rng.choice(["기업보상팀 김주임", "기업보상팀 이대리", "손사팀 박과장"])
                 reviewed_at = (occurred + timedelta(hours=rng.randint(2, 30))).strftime("%Y-%m-%dT%H:%M:00")
 
+        # 오래된 사고일수록 조치가 끝나고 보험금까지 지급돼 종결된다.
+        lc = {"actionCompleted": False, "actionCompletedAt": None,
+              "claimPaid": False, "claimPaidAt": None, "claimAmountKRW": None}
+        if days_ago >= 2 and rng.random() < min(0.85, 0.18 * days_ago):
+            done_at = occurred + timedelta(days=rng.randint(1, max(1, days_ago)), hours=rng.randint(0, 20))
+            if done_at > BASE_DAY:                      # 기준시각을 넘지 않게
+                done_at = BASE_DAY - timedelta(hours=rng.randint(1, 12))
+            if done_at < occurred:                      # 발생보다 앞설 수도 없다
+                done_at = occurred + timedelta(hours=1)
+            lc["actionCompleted"] = True
+            lc["actionCompletedAt"] = done_at.strftime("%Y-%m-%dT%H:%M:00")
+            # 연관 건은 보험금 지급까지 끝나야 종결로 본다. 지급은 반드시 조치완료 이후.
+            room = (BASE_DAY - done_at).total_seconds() / 3600
+            if matched and room >= 6 and rng.random() < 0.72:
+                paid_at = done_at + timedelta(hours=rng.randint(4, max(5, int(room))))
+                if paid_at > BASE_DAY:
+                    paid_at = BASE_DAY
+                lc["claimPaid"] = True
+                lc["claimPaidAt"] = paid_at.strftime("%Y-%m-%dT%H:%M:00")
+                # 자기부담금 제하고 삼성화재 보유비율만큼 지급
+                ded = contracts[0]["deductible"]
+                share = contracts[0]["samsungShare"]["percentOfTotalPremium"] / 100
+                base = max(0, (loss or 0) - ded)
+                lc["claimAmountKRW"] = int(base * share) if base else 0
+
         out.append(incident(
             id=f"INC-{occurred.strftime('%Y%m%d')}-{start_seq + k:03d}",
             occurredAt=occ_iso, title=title, itype=itype, industry=industry,
@@ -598,7 +629,7 @@ def gen_bulk(n, start_seq):
             sourceNote=rng.choice(SOURCES), entityName=entity, bizRegNo=biz,
             matched=matched, confidence=confidence, contracts=contracts,
             reviewed=reviewed, reviewedBy=reviewed_by, reviewedAt=reviewed_at,
-            alertSent=alert_sent, alertLog=alerts,
+            alertSent=alert_sent, alertLog=alerts, lifecycle=lc,
         ))
     return out
 

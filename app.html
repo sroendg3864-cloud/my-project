@@ -131,6 +131,7 @@
   .live-dot.paused{ background:var(--ink-faint); }
   .live-dot.pulse{ animation:pulse 1.6s ease-in-out infinite; }
   @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent);} 50%{ box-shadow:0 0 0 5px transparent; } }
+  [hidden]{ display:none !important; }   /* .btn의 display:inline-flex가 hidden을 덮지 않도록 */
   .btn{
     font-size:13px; font-weight:600; padding:7px 13px; border-radius:8px;
     border:1px solid var(--border); background:var(--surface); color:var(--ink);
@@ -168,26 +169,104 @@
   .summary .num.warning{ color:var(--warning); }
   .summary .label{ font-size:12px; color:var(--ink-faint); }
 
-  /* ---------- layout ---------- */
+  /* ---------- layout ----------
+     웹(넓은 화면)에서는 지도 / 피드 / 사이드레일 3단.
+     좁아지면 2단 -> 1단으로 접힌다. */
   .layout{
     flex:1; display:grid;
-    grid-template-columns:minmax(320px,420px) 1fr;
     min-height:0;
+    grid-template-columns:1fr;
+    grid-template-areas:"map" "feed" "rail";
   }
-  @media (max-width:920px){
-    .layout{ grid-template-columns:1fr; }
+  @media (min-width:920px){
+    .layout{
+      grid-template-columns:minmax(340px,420px) 1fr;
+      grid-template-areas:"map feed" "rail feed";
+      grid-template-rows:max-content 1fr;
+      align-items:start;
+    }
+    /* 피드가 길어지면 사이드레일이 화면 밖으로 밀려나므로 피드는 자기 안에서 스크롤시킨다 */
+    .feedpane{ max-height:100vh; overflow:auto; }
   }
+  @media (min-width:1500px){
+    .layout{
+      grid-template-columns:minmax(460px,1fr) minmax(520px,1.25fr) minmax(320px,360px);
+      grid-template-areas:"map feed rail";
+    }
+  }
+  .mappane{ grid-area:map; }
+  .feedpane{ grid-area:feed; }
+  .siderail{ grid-area:rail; }
 
   .mappane{
     border-right:1px solid var(--border);
     padding:16px; display:flex; flex-direction:column; gap:12px;
-    position:sticky; top:0; align-self:flex-start;
-    max-height:calc(100vh - 0px);
-    overflow:auto;
   }
-  @media (max-width:920px){
-    .mappane{ position:static; max-height:none; border-right:none; border-bottom:1px solid var(--border); }
+  @media (min-width:1500px){
+    .mappane{ position:sticky; top:0; align-self:start; max-height:100vh; overflow:auto; }
   }
+  @media (max-width:919px){
+    .mappane{ border-right:none; border-bottom:1px solid var(--border); }
+  }
+
+  .siderail{
+    padding:16px; display:flex; flex-direction:column; gap:12px;
+    border-right:1px solid var(--border);
+  }
+  @media (min-width:1500px){
+    .siderail{
+      border-right:none; border-left:1px solid var(--border);
+      position:sticky; top:0; align-self:start; max-height:100vh; overflow:auto;
+    }
+  }
+  @media (max-width:919px){
+    .siderail{ border-right:none; border-top:1px solid var(--border); }
+  }
+
+  /* ---------- map toolbar / 지역 선택 ---------- */
+  .map-toolbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .seg{ display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .seg-btn{
+    font-family:inherit; font-size:12px; color:var(--ink-dim); cursor:pointer;
+    background:var(--surface); border:none; padding:5px 11px; white-space:nowrap;
+  }
+  .seg-btn + .seg-btn{ border-left:1px solid var(--border); }
+  .seg-btn:hover{ background:var(--surface-2); }
+  .seg-btn.active{ background:var(--accent); color:#fff; font-weight:600; }
+  .province{ transition:fill .18s ease; }
+  .province:hover{ stroke:var(--accent); stroke-width:1.6; cursor:pointer; }
+  .province.selected{ stroke:var(--accent-strong); stroke-width:2.4; }
+
+  /* ---------- 지역별 집계 목록 ---------- */
+  .region-row{
+    width:100%; display:grid; grid-template-columns:auto 1fr auto auto; gap:8px;
+    align-items:center; padding:7px 12px; cursor:pointer; text-align:left;
+    background:none; border:none; border-bottom:1px solid var(--border); font-family:inherit;
+  }
+  .region-row:last-child{ border-bottom:none; }
+  .region-row:hover{ background:var(--surface-2); }
+  .region-row.active{ background:var(--accent-soft); }
+  .region-row .rg-name{ font-size:12.5px; color:var(--ink); white-space:nowrap; }
+  .region-row .rg-bar{ height:6px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+  .region-row .rg-bar span{ display:block; height:100%; background:var(--accent); border-radius:99px; }
+  .region-row .rg-num{ font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; min-width:22px; text-align:right; }
+  .region-row .rg-sub{ font-size:11px; color:var(--danger); font-variant-numeric:tabular-nums; min-width:18px; text-align:right; }
+
+  /* ---------- 종결 이력 ---------- */
+  .hist-search{ padding:8px 10px; border-bottom:1px solid var(--border); }
+  .hist-search input{ width:100%; font-size:12px; padding:5px 8px; }
+  .hist-item{
+    padding:9px 12px; border-bottom:1px solid var(--border); cursor:pointer;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .hist-item:last-child{ border-bottom:none; }
+  .hist-item:hover{ background:var(--surface-2); }
+  .hist-top{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .hist-title{ font-size:12.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hist-date{ font-size:10.5px; color:var(--ink-faint); white-space:nowrap; flex:none; }
+  .hist-meta{ display:flex; gap:4px; flex-wrap:wrap; }
+  .hist-pay{ font-size:11.5px; color:var(--ink-dim); }
+  .badge.closed{ background:var(--surface-2); color:var(--ink-faint); }
   .map-frame{
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
     padding:8px; box-shadow:var(--shadow);
@@ -458,6 +537,7 @@
     <div class="status-cluster">
       <span class="live-pill" id="livePill"><span class="live-dot pulse" id="liveDot"></span><span id="liveText">자동 갱신 중 · 10분 간격</span></span>
       <span class="live-pill" id="lastUpdatedPill">마지막 업데이트 —</span>
+      <button class="btn" id="btnDemoFast" title="사고 발생·조치완료를 빠르게 돌려 동작을 확인합니다">▶ 시연 모드</button>
       <button class="btn" id="btnToggleLive">일시정지</button>
       <button class="btn primary" id="btnSimulate">＋ 새 속보 시뮬레이션</button>
     </div>
@@ -484,19 +564,17 @@
 
   <main class="layout">
     <section class="mappane">
+      <div class="map-toolbar">
+        <div class="seg" id="mapModes">
+          <button class="seg-btn active" data-mode="pin">사고 위치</button>
+          <button class="seg-btn" data-mode="region">지역별 집계</button>
+        </div>
+        <button class="btn ghost small" id="btnClearRegion" hidden>지역 해제 ✕</button>
+      </div>
       <div class="map-frame">
         <svg id="koreaMap" viewBox="0 0 520 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="대한민국 사고 발생 지도"></svg>
       </div>
       <div class="legend" id="mapLegend"></div>
-
-      <div class="alert-panel">
-        <div class="ap-head">
-          <h3>담당자 알림 현황</h3>
-          <span class="ap-count" id="alertPanelCount"></span>
-        </div>
-        <div class="ap-note">삼성화재 계약 연관 사고에 대해 담당 언더라이터에게 나가는 알림입니다.</div>
-        <div class="ap-list" id="alertPanelList"></div>
-      </div>
 
       <div class="filters">
         <div class="filter-row">
@@ -535,6 +613,36 @@
       </div>
       <div class="feed-list" id="feedList"></div>
     </section>
+
+    <aside class="siderail">
+      <div class="alert-panel">
+        <div class="ap-head">
+          <h3>담당자 알림 현황</h3>
+          <span class="ap-count" id="alertPanelCount"></span>
+        </div>
+        <div class="ap-note">삼성화재 계약 연관 사고에 대해 담당 언더라이터에게 나가는 알림입니다.</div>
+        <div class="ap-list" id="alertPanelList"></div>
+      </div>
+
+      <div class="alert-panel">
+        <div class="ap-head">
+          <h3>지역별 집계</h3>
+          <span class="ap-count" id="regionCount"></span>
+        </div>
+        <div class="ap-note">행을 누르면 그 지역만 봅니다. 오른쪽 숫자는 전체 · 삼성화재 연관 건수입니다.</div>
+        <div class="ap-list" id="regionList"></div>
+      </div>
+
+      <div class="alert-panel">
+        <div class="ap-head">
+          <h3>종결 이력</h3>
+          <span class="ap-count" id="historyCount"></span>
+        </div>
+        <div class="ap-note">조치완료 + 보험금 지급까지 끝나 지도에서 내려간 사고입니다.</div>
+        <div class="hist-search"><input type="search" id="historySearch" placeholder="종결 사고 검색"></div>
+        <div class="ap-list" id="historyList"></div>
+      </div>
+    </aside>
   </main>
 
   <div class="footnote">이 화면의 사고·뉴스·계약 정보는 전부 가상의 예시 데이터이며 실제 사고·보험 계약과 무관합니다. 실제 연동 시 뉴스 API와 사내 계약관리 시스템 API로 교체가 필요합니다.</div>
@@ -588,7 +696,9 @@ let RAW_TEMPLATE = null;
 let ARTIFACT = null;
 let CAN_WRITE = true;
 let liveTimer = null;
-let uiFilters = { type:"all", stage:"all", search:"", matchedOnly:false, unreviewedOnly:false, dateFrom:"", dateTo:"" };
+let uiFilters = { type:"all", stage:"all", search:"", matchedOnly:false, unreviewedOnly:false, dateFrom:"", dateTo:"", region:"" };
+let mapMode = "pin";        // "pin" | "region"
+let historySearch = "";
 let openDetailId = null;
 
 function loadInitialState(){
@@ -674,6 +784,37 @@ function showReadonlyBanner(){
   document.getElementById("readonlyBanner").classList.add("show");
 }
 
+/* ---------------- lifecycle (진행중 / 종결) ---------------- */
+
+// 예전 상태로 저장된 데이터에도 lifecycle이 항상 있도록 보정
+function ensureLifecycle(inc){
+  if(!inc.lifecycle){
+    inc.lifecycle = { actionCompleted:false, actionCompletedAt:null,
+                      claimPaid:false, claimPaidAt:null, claimAmountKRW:null };
+  }
+  return inc.lifecycle;
+}
+
+// 종결 = 조치완료 + 보험금 지급완료.
+// 삼성화재 연관이 아닌 건은 지급할 보험금 자체가 없으므로 조치완료만으로 종결로 본다.
+function isClosed(inc){
+  const lc = ensureLifecycle(inc);
+  if(!lc.actionCompleted) return false;
+  const matched = inc.samsungMatch && inc.samsungMatch.matched;
+  return matched ? !!lc.claimPaid : true;
+}
+
+function closedAt(inc){
+  const lc = ensureLifecycle(inc);
+  return lc.claimPaidAt || lc.actionCompletedAt || null;
+}
+
+function liveIncidents(){ return STATE.incidents.filter(i => !isClosed(i)); }
+function closedIncidents(){
+  return STATE.incidents.filter(isClosed)
+    .sort((a,b) => String(closedAt(b)).localeCompare(String(closedAt(a))));
+}
+
 /* ---------------- rendering: map ---------------- */
 
 function project(lat, lng){
@@ -688,9 +829,141 @@ function renderMapBase(){
   svg.setAttribute("viewBox", KOREA_MAP.viewBox);
   let paths = "";
   KOREA_MAP.provinces.forEach(p => {
-    paths += `<path class="province" d="${p.d}" data-code="${p.code}"><title>${escapeHtml(p.name)}</title></path>`;
+    paths += `<path class="province" d="${p.d}" data-code="${p.code}" data-name="${escapeHtml(p.name)}"><title>${escapeHtml(p.name)}</title></path>`;
   });
   svg.innerHTML = `<g id="provinces">${paths}</g><g id="pins"></g>`;
+  svg.querySelectorAll(".province").forEach(el => {
+    el.addEventListener("click", () => toggleRegion(el.dataset.name));
+  });
+}
+
+/* ---------------- 지역별 집계 ---------------- */
+
+// 지도 JSON은 옛 지명(강원도/전라북도)을, 사고 데이터는 현재 지명을 쓴다. 하나로 맞춘다.
+const REGION_ALIAS = {
+  "강원특별자치도": "강원도",
+  "전북특별자치도": "전라북도",
+};
+function normRegion(name){ return REGION_ALIAS[name] || name; }
+
+function regionCounts(list){
+  const counts = new Map();
+  list.forEach(inc => {
+    const key = normRegion(inc.location.region);
+    const cur = counts.get(key) || { total:0, matched:0 };
+    cur.total++;
+    if(inc.samsungMatch && inc.samsungMatch.matched) cur.matched++;
+    counts.set(key, cur);
+  });
+  return counts;
+}
+
+function renderMapView(list){
+  if(mapMode === "region") renderChoropleth(list);
+  else renderPins(list);
+  highlightSelectedRegion();
+}
+
+function renderChoropleth(list){
+  const counts = regionCounts(list);
+  let max = 0;
+  counts.forEach(v => { if(v.total > max) max = v.total; });
+  document.querySelectorAll("#provinces .province").forEach(el => {
+    const name = el.dataset.name;
+    const c = counts.get(name);
+    const n = c ? c.total : 0;
+    // 0건은 기본색, 그 외에는 건수 비례로 진하게
+    el.style.fill = n === 0 ? "" : `color-mix(in srgb, var(--danger) ${Math.round(12 + (n/max)*68)}%, var(--surface-2))`;
+    el.querySelector("title").textContent = `${name} — ${n}건${c && c.matched ? ` (연관 ${c.matched}건)` : ""}`;
+  });
+  document.getElementById("pins").innerHTML = "";
+}
+
+function clearChoropleth(){
+  document.querySelectorAll("#provinces .province").forEach(el => {
+    el.style.fill = "";
+    el.querySelector("title").textContent = el.dataset.name;
+  });
+}
+
+function highlightSelectedRegion(){
+  const sel = uiFilters.region ? normRegion(uiFilters.region) : "";
+  const btn = document.getElementById("btnClearRegion");
+  btn.hidden = !sel;
+  if(sel) btn.textContent = `${sel} 해제 ✕`;
+  document.querySelectorAll("#provinces .province").forEach(el => {
+    el.classList.toggle("selected", !!sel && el.dataset.name === sel);
+  });
+}
+
+function renderRegionStats(list){
+  const counts = regionCounts(list);
+  const rows = [...counts.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a,b) => b.total - a.total || a.name.localeCompare(b.name));
+  const el = document.getElementById("regionList");
+  document.getElementById("regionCount").textContent =
+    rows.length ? `${rows.length}개 시도 · ${list.length}건` : "";
+  if(!rows.length){
+    el.innerHTML = `<div class="ap-empty">집계할 사고가 없습니다.</div>`;
+    return;
+  }
+  const max = rows[0].total;
+  el.innerHTML = rows.map(r => `
+    <button class="region-row${normRegion(uiFilters.region) === r.name ? " active" : ""}" data-region="${escapeHtml(r.name)}">
+      <span class="rg-name">${escapeHtml(r.name)}</span>
+      <span class="rg-bar"><span style="width:${Math.round(r.total/max*100)}%"></span></span>
+      <span class="rg-num mono">${r.total}</span>
+      <span class="rg-sub mono">${r.matched}</span>
+    </button>`).join("");
+  el.querySelectorAll(".region-row").forEach(b => {
+    b.addEventListener("click", () => toggleRegion(b.dataset.region));
+  });
+}
+
+function toggleRegion(name){
+  uiFilters.region = (normRegion(uiFilters.region) === name) ? "" : name;
+  render();
+}
+
+/* ---------------- 종결 이력 ---------------- */
+
+function renderHistory(){
+  const all = closedIncidents();
+  const q = historySearch.trim().toLowerCase();
+  const rows = q
+    ? all.filter(i => (i.title + " " + i.location.region + " " + i.relatedEntity.name).toLowerCase().includes(q))
+    : all;
+  document.getElementById("historyCount").textContent = all.length ? `${rows.length} / ${all.length}건` : "0건";
+
+  const el = document.getElementById("historyList");
+  if(!rows.length){
+    el.innerHTML = `<div class="ap-empty">${all.length ? "검색 결과가 없습니다." : "아직 종결된 사고가 없습니다."}</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(inc => {
+    const lc = inc.lifecycle;
+    const matched = inc.samsungMatch && inc.samsungMatch.matched;
+    return `<div class="hist-item" data-id="${escapeHtml(inc.id)}">
+      <div class="hist-top">
+        <span class="hist-title">${escapeHtml(inc.title)}</span>
+        <span class="hist-date mono">${fmtDateTime(closedAt(inc))}</span>
+      </div>
+      <div class="hist-meta">
+        <span class="badge type">${inc.type}</span>
+        ${matched ? `<span class="badge match">삼성화재 연관</span>` : `<span class="badge nomatch">연관 없음</span>`}
+        <span class="badge closed">종결</span>
+      </div>
+      <div class="hist-pay">
+        ${lc.claimPaid
+          ? `보험금 지급 <b>${fmtKRW(lc.claimAmountKRW)}</b>`
+          : `<span style="color:var(--ink-faint)">보험금 지급 해당 없음</span>`}
+      </div>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".hist-item").forEach(e => {
+    e.addEventListener("click", () => openDetail(e.dataset.id));
+  });
 }
 
 function renderPins(list){
@@ -741,6 +1014,7 @@ function applyFilters(list){
     const day = inc.occurredAt.slice(0,10);
     if(uiFilters.dateFrom && day < uiFilters.dateFrom) return false;
     if(uiFilters.dateTo && day > uiFilters.dateTo) return false;
+    if(uiFilters.region && normRegion(inc.location.region) !== normRegion(uiFilters.region)) return false;
     if(uiFilters.search){
       const q = uiFilters.search.toLowerCase();
       const hay = (inc.title + " " + inc.location.region + " " + inc.location.address + " " + inc.relatedEntity.name).toLowerCase();
@@ -1045,6 +1319,28 @@ function contractCardHtml(c){
   </div>`;
 }
 
+function lifecycleHtml(inc){
+  const lc = ensureLifecycle(inc);
+  const matched = inc.samsungMatch && inc.samsungMatch.matched;
+  const closed = isClosed(inc);
+  return `<div>
+    <div class="section-title">처리 상태</div>
+    <dl class="kv-grid">
+      <dt>조치완료</dt><dd>${lc.actionCompleted
+        ? `완료 · <span class="mono">${fmtDateTime(lc.actionCompletedAt)}</span>`
+        : `<span style="color:var(--ink-faint)">진행 중</span>`}</dd>
+      <dt>보험금 지급</dt><dd>${!matched
+        ? `<span style="color:var(--ink-faint)">해당 없음 (연관 계약 없음)</span>`
+        : lc.claimPaid
+          ? `지급완료 <b>${fmtKRW(lc.claimAmountKRW)}</b> · <span class="mono">${fmtDateTime(lc.claimPaidAt)}</span>`
+          : `<span style="color:var(--ink-faint)">미지급</span>`}</dd>
+      <dt>종결 여부</dt><dd>${closed
+        ? `<b>종결</b> — 지도·피드에서 내려가고 종결 이력에서 조회됩니다.`
+        : `진행 중`}</dd>
+    </dl>
+  </div>`;
+}
+
 function renderDetail(){
   const inc = findIncident(openDetailId);
   const drawer = document.getElementById("detailDrawer");
@@ -1068,8 +1364,11 @@ function renderDetail(){
           <span class="badge type">${inc.type} · ${inc.industry}</span>
           ${matched ? `<span class="badge match">🔺 삼성화재 연관 (${escapeHtml(inc.samsungMatch.confidence)})</span>` : `<span class="badge nomatch">삼성화재 연관 없음</span>`}
           ${wf.reviewed ? `<span class="badge reviewed">검토완료</span>` : ""}
+          ${isClosed(inc) ? `<span class="badge closed">종결</span>` : ""}
         </div>
       </div>
+
+      ${lifecycleHtml(inc)}
 
       <div>
         <div class="section-title">피해 현황</div>
@@ -1172,12 +1471,15 @@ function showToast(text, critical){
 
 function render(){
   updateLastUpdatedPill();
-  const filtered = applyFilters(STATE.incidents);
+  // 종결된 사고는 지도·피드에서 빠지고 "종결 이력"에서만 보인다.
+  const filtered = applyFilters(liveIncidents());
   renderSummary(filtered);
   renderDateSummary(filtered);
-  renderPins(filtered);
+  renderMapView(filtered);
   renderFeed(filtered);
   renderAlertPanel(filtered);
+  renderRegionStats(filtered);
+  renderHistory();
   if(openDetailId) renderDetail();
 }
 
@@ -1292,6 +1594,7 @@ function generateNewIncident(){
     relatedEntity: { name: scn.entity, bizRegNo: scn.biz },
     samsungMatch: match,
     workflow: { reviewed:false, reviewedBy:null, reviewedAt:null, assignedTo:null, notes:[], alertSent:false, alertLog:[] },
+    lifecycle: { actionCompleted:false, actionCompletedAt:null, claimPaid:false, claimPaidAt:null, claimAmountKRW:null },
   };
   STATE.incidents.unshift(inc);
   STATE.lastUpdated = inc.occurredAt;
@@ -1308,21 +1611,97 @@ async function triggerNewIncident(manual){
     showToast(`신규 속보: ${inc.title}`, false);
   }
   setTimeout(() => { justAddedIds.delete(inc.id); }, 5000);
-  await persist();
+  // 시연 모드는 몇 초마다 사고가 생기므로 그때마다 재발행하면 모든 뷰어가 계속 새로고침된다.
+  if(manual || !demoFast) await persist();
+  else updateLastUpdatedPill();
+}
+
+/* ---------------- 사고 자동 진행 ----------------
+   대응단계가 끝까지 가면 조치완료 -> (연관건이면) 보험금 지급 -> 종결.
+   종결되면 지도·피드에서 내려가고 종결 이력으로 넘어간다.
+   이 진행은 화면에서만 도는 시뮬레이션이라 publish 하지 않는다
+   (몇 초마다 페이지를 재발행하면 모든 뷰어가 계속 새로고침되기 때문). */
+
+const NEXT_STAGE = {
+  "화재": ["신고접수","소방출동","진압중","진화완료","원인조사","후속조치"],
+  "폭발": ["신고접수","소방·화학구조대출동","진압/수습","주민대피","환경영향조사","후속조치"],
+  "붕괴": ["신고접수","구조대출동","구조/수습","현장통제","정밀안전진단","후속조치"],
+  "수재": ["침수신고","배수작업","응급복구","피해조사","후속조치"],
+  "교통사고": ["신고접수","구급대출동","구조/이송","현장정리","후속조치"],
+};
+
+function advanceOne(inc){
+  const lc = ensureLifecycle(inc);
+  const matched = inc.samsungMatch && inc.samsungMatch.matched;
+
+  // 1) 조치완료된 연관건이면 보험금 지급으로 종결
+  if(lc.actionCompleted){
+    if(matched && !lc.claimPaid){
+      const c = inc.samsungMatch.contracts[0];
+      const base = Math.max(0, (inc.propertyDamage.estimatedLossKRW || 0) - (c ? c.deductible : 0));
+      const share = c ? c.samsungShare.percentOfTotalPremium / 100 : 0;
+      lc.claimPaid = true;
+      lc.claimPaidAt = nowIso();
+      lc.claimAmountKRW = Math.round(base * share);
+      return "closed";
+    }
+    return null;
+  }
+
+  // 2) 대응단계를 한 칸 진행
+  const seq = NEXT_STAGE[inc.type] || ["신고접수","소방출동","진화완료"];
+  const idx = seq.indexOf(inc.responseStage);
+  if(idx >= 0 && idx < seq.length - 1){
+    const next = seq[idx + 1];
+    inc.responseStage = next;
+    inc.stageHistory.push({ stage: next, at: nowIso() });
+    return "stage";
+  }
+
+  // 3) 마지막 단계까지 갔으면 조치완료
+  lc.actionCompleted = true;
+  lc.actionCompletedAt = nowIso();
+  return matched ? "action" : "closed";
+}
+
+function advanceLifecycles(){
+  const open = STATE.incidents.filter(i => !isClosed(i));
+  if(!open.length) return 0;
+  // 시연 모드에서도 종결이 발생보다 지나치게 빠르면 목록이 비어버린다.
+  // 신규 발생 주기(4초)와 균형이 맞도록 진행 확률을 낮게 잡는다.
+  const p = demoFast ? 0.06 : 0.03;
+  let closedCount = 0, changed = 0;
+  open.forEach(inc => {
+    if(Math.random() >= p) return;
+    const r = advanceOne(inc);
+    if(r){ changed++; if(r === "closed") closedCount++; }
+  });
+  if(changed) render();
+  return closedCount;
 }
 
 /* ---------------- live timer ---------------- */
 
-const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
 let liveActive = true;
+let demoFast = false;
+let lastGenAt = Date.now();
 
-function msSinceLastUpdate(){
-  return Date.now() - new Date(STATE.lastUpdated).getTime();
-}
+const TICK_MS = 2000;
+function newIncidentIntervalMs(){ return demoFast ? 4 * 1000 : 10 * 60 * 1000; }
+function advanceIntervalMs(){ return demoFast ? 2 * 1000 : 30 * 1000; }
+let lastAdvanceAt = Date.now();
 
 function tick(){
   if(!liveActive) return;
-  if(msSinceLastUpdate() >= UPDATE_INTERVAL_MS){
+  const now = Date.now();
+  if(now - lastAdvanceAt >= advanceIntervalMs()){
+    lastAdvanceAt = now;
+    const closed = advanceLifecycles();
+    // 시연 모드에서는 종결이 잦아 토스트가 화면을 덮으므로 알리지 않는다
+    if(closed && !demoFast) showToast(`${closed}건이 조치·보험금 지급 완료로 종결되어 이력으로 이동했습니다.`, false);
+  }
+  if(now - lastGenAt >= newIncidentIntervalMs()){
+    lastGenAt = now;
     triggerNewIncident(false);
   }
 }
@@ -1333,7 +1712,7 @@ function setLivePillState(){
   const btn = document.getElementById("btnToggleLive");
   if(liveActive){
     dot.classList.remove("paused"); dot.classList.add("pulse");
-    text.textContent = "자동 갱신 중 · 10분 간격";
+    text.textContent = demoFast ? "시연 모드 · 빠른 발생/종결" : "자동 갱신 중 · 10분 간격";
     btn.textContent = "일시정지";
   }else{
     dot.classList.add("paused"); dot.classList.remove("pulse");
@@ -1372,8 +1751,28 @@ function wireEvents(){
     render();
   });
   document.getElementById("btnDateClear").addEventListener("click", () => applyDatePreset("all"));
+  document.querySelectorAll("#mapModes .seg-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      mapMode = b.dataset.mode;
+      document.querySelectorAll("#mapModes .seg-btn").forEach(x => x.classList.toggle("active", x === b));
+      if(mapMode === "pin") clearChoropleth();
+      render();
+    });
+  });
+  document.getElementById("btnClearRegion").addEventListener("click", () => { uiFilters.region = ""; render(); });
+  document.getElementById("historySearch").addEventListener("input", e => {
+    historySearch = e.target.value;
+    renderHistory();
+  });
   document.getElementById("btnSimulate").addEventListener("click", () => triggerNewIncident(true));
   document.getElementById("btnToggleLive").addEventListener("click", () => { liveActive = !liveActive; setLivePillState(); });
+  document.getElementById("btnDemoFast").addEventListener("click", e => {
+    demoFast = !demoFast;
+    e.target.classList.toggle("primary", demoFast);
+    e.target.textContent = demoFast ? "■ 시연 모드 끄기" : "▶ 시연 모드";
+    lastGenAt = Date.now(); lastAdvanceAt = Date.now();
+    setLivePillState();
+  });
   document.getElementById("scrim").addEventListener("click", closeDetail);
   document.addEventListener("keydown", e => { if(e.key === "Escape") closeDetail(); });
 }
@@ -1392,8 +1791,8 @@ async function init(){
   }catch(e){ ARTIFACT = null; }
   if(!ARTIFACT) showReadonlyBanner(); // no capability available: still usable, just not persisted
 
-  setInterval(tick, 30 * 1000);
-  setInterval(() => { updateLastUpdatedPill(); renderFeed(applyFilters(STATE.incidents)); }, 60 * 1000);
+  setInterval(tick, TICK_MS);
+  setInterval(() => { updateLastUpdatedPill(); renderFeed(applyFilters(liveIncidents())); }, 60 * 1000);
 }
 
 document.addEventListener("DOMContentLoaded", init);
