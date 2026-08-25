@@ -178,6 +178,35 @@ lifecycle: { actionCompleted, actionCompletedAt, claimPaid, claimPaidAt, claimAm
 더미 데이터 날짜가 고정돼 있어서 실제 시계를 쓰면 "오늘"이 항상 0건이 되기 때문입니다.
 시뮬레이션으로 사고를 추가하면 실제 현재시각으로 들어오므로 기준일도 자연히 그쪽으로 옮겨갑니다.
 
+## 재보험 구조 및 보유 (`reinsuranceHtml()`)
+계약마다 재보험 프로그램을 임의로 붙이고, **보유보험료**와 **사고별 보유손해액**을 계산해서 보여줍니다.
+상세 패널 계약 카드의 "과거 손해 이력" 아래에 붙습니다.
+
+**출재 순서** — 실제 구조 그대로입니다.
+```
+원수(삼성화재 인수분) → 비례(QS/Surplus) 출재 → 남은 보유분에 XOL 회수 → 최종 보유
+```
+
+**데이터** (`gen_state.py`의 `reinsurance_program()`, 앱 쪽 대응은 `buildReinsurance()`)
+- `quotaSharePercent` — QS 출재율 (20~50%)
+- `surplusLines` / `retentionLineKRW` — 초과액 재보험 선수와 보유 1선
+- `cededRatio` — QS와 Surplus를 합친 **최종 비례 출재율** (최대 85%)
+- `cedingCommissionPercent` — 출재수수료율 (15~25%)
+- `xolLayers[]` — 층별 `attachmentKRW`(부담개시점) / `limitKRW`(한도) / `rateOnLinePercent`(ROL) / `treatyPremiumKRW`(특약 전체) / `premiumKRW`(이 계약 배분분)
+- `stopLoss` — 연간 누적 손해율 기준 (`95% 초과분 40%p`)
+- `reinsurers[]` — Munich Re, Swiss Re, 코리안리 등
+
+**계산** (`app.html`)
+- `lossRetention(inc, c)` — 발생손해(삼성분) → 비례출재 → XOL 층별 회수 → **보유손해액**
+  - 층 회수 = `max(0, min(비례출재후손해 − attachment, limit))`
+- `premiumRetention(c)` — `원수보험료 − 비례출재보험료 + 출재수수료 − XOL료 − StopLoss료` = **보유보험료**
+
+**설계에서 짚은 것**
+- XOL·Stop Loss는 **특약(포트폴리오) 단위**로 잡았습니다. 한 계약의 보험료로 그 계약 전체를 덮는 층을 살 수는 없어서, 처음에 층 한도를 계약 규모로 잡았더니 ROL이 0.07% 같은 말이 안 되는 값이 나왔습니다. 지금은 층의 부담범위·ROL은 특약 규모(1층 ROL 9~16%, 상위층 3~7.5%)로 두고 이 계약에는 **배분 재보험료**만 매깁니다.
+- Stop Loss는 연간 누적 기준이라 **사고 단건에는 적용하지 않습니다.** 화면에도 그렇게 적어둡니다.
+- 보험금 지급액(`claimAmountKRW`)은 계약자에게 나가는 **원수 기준**이고, 보유손해액은 재보험 회수 후 삼성화재가 실제로 떠안는 금액입니다. 둘은 다릅니다.
+- CSV에 `재보험구조 / 비례출재율 / 원수보험료 / 보유보험료 / 발생손해_삼성분 / XOL회수 / 보유손해액` 7개 컬럼이 추가됐습니다 (총 38컬럼).
+
 ## 계약 이력 · 과거 손해 정보
 계약이 **신규**인지 **갱신**인지, 갱신이면 언제부터 몇 회 갱신했는지와 그 계약·물건의 과거 손해 이력(빈도·심도·손해율)을 함께 보여줍니다.
 

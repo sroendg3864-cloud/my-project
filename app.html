@@ -521,6 +521,33 @@
   .lh-bar span.bad{ background:var(--danger); }
   .lh-empty{ font-size:12px; color:var(--ink-faint); }
 
+  /* 재보험 구조 · 보유 */
+  .reins{
+    border:1px solid var(--border); border-radius:10px; padding:10px 11px;
+    background:var(--surface); display:flex; flex-direction:column; gap:10px;
+  }
+  .reins-sub{ font-size:11.5px; font-weight:600; color:var(--ink-dim); margin-bottom:5px; }
+  .reins-sub .muted, .flow .muted{ font-weight:400; color:var(--ink-faint); font-size:10.5px; }
+  .reins-table thead th{
+    font-size:10.5px; font-weight:600; color:var(--ink-faint); text-align:left;
+    padding:0 0 4px; border-bottom:1px solid var(--border);
+  }
+  .reins-table thead th:nth-child(3), .reins-table thead th:nth-child(4){ text-align:right; }
+  .ceded{ color:var(--danger); }
+  .retained{ color:var(--success); }
+
+  .flow{ display:flex; flex-direction:column; }
+  .flow-row{
+    display:flex; justify-content:space-between; gap:10px; align-items:baseline;
+    font-size:12px; padding:3px 0; color:var(--ink-dim);
+  }
+  .flow-row.minus{ color:var(--danger); }
+  .flow-row.plus{ color:var(--success); }
+  .flow-row.total{
+    border-top:1px solid var(--border); margin-top:3px; padding-top:6px;
+    font-weight:700; font-size:13px; color:var(--ink);
+  }
+
   .coins-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
   .coins-table td{ padding:4px 0; border-bottom:1px dashed var(--border); }
   .coins-table tr:last-child td{ border-bottom:none; }
@@ -826,7 +853,9 @@ function fmtKRW(n){
   if(n === null || n === undefined) return "추산 불가";
   const eok = n / 100000000;
   if(eok >= 1) return eok.toLocaleString("ko-KR", {maximumFractionDigits:1}) + "억원";
-  return (n/10000).toLocaleString("ko-KR") + "만원";
+  if(Math.abs(n) < 10000) return Math.round(n).toLocaleString("ko-KR") + "원";
+  // 만원 단위는 소수점 없이 (8,365.807만원 같은 표기가 나오지 않도록)
+  return Math.round(n/10000).toLocaleString("ko-KR") + "만원";
 }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1327,6 +1356,13 @@ const CSV_COLS = [
   ["보유비율(%)",  i => { const c = i.samsungMatch.contracts[0]; return c ? c.samsungShare.percentOfTotalPremium : ""; }],
   ["계약구분",     i => { const c = i.samsungMatch.contracts[0]; if(!c || !c.contractType) return ""; return c.contractType.isNew ? "신규" : `갱신 ${c.contractType.renewalCount}회`; }],
   ["과거손해율(%)",i => { const c = i.samsungMatch.contracts[0]; return c && c.lossHistory ? c.lossHistory.lossRatioPercent : ""; }],
+  ["재보험구조",   i => { const c = i.samsungMatch.contracts[0]; return c && c.reinsurance ? c.reinsurance.structureLabel : ""; }],
+  ["비례출재율(%)",i => { const c = i.samsungMatch.contracts[0]; return c && c.reinsurance ? (c.reinsurance.cededRatio*100).toFixed(1) : ""; }],
+  ["원수보험료(원)", i => { const c = i.samsungMatch.contracts[0]; return c ? (c.grossPremiumKRW ?? "") : ""; }],
+  ["보유보험료(원)", i => { const c = i.samsungMatch.contracts[0]; return c ? premiumRetention(c).net : ""; }],
+  ["발생손해_삼성분(원)", i => { const c = i.samsungMatch.contracts[0]; return c ? lossRetention(i, c).gross : ""; }],
+  ["XOL회수(원)",  i => { const c = i.samsungMatch.contracts[0]; return c ? lossRetention(i, c).xolRecovery : ""; }],
+  ["보유손해액(원)", i => { const c = i.samsungMatch.contracts[0]; return c ? lossRetention(i, c).net : ""; }],
   ["담당자",       i => { const c = i.samsungMatch.contracts[0]; return c ? c.underwriter.name : ""; }],
   ["검토완료",     i => i.workflow.reviewed ? "Y" : "N"],
   ["알림발송",     i => i.workflow.alertSent ? "Y" : "N"],
@@ -1700,6 +1736,52 @@ function coverageOf(inc){
   return states.find(s => s.state === "valid") || states[0] || null;
 }
 
+/* ---------------- 재보험 출재 · 보유 계산 ----------------
+   흐름은 실제 출재 순서를 그대로 따른다.
+     원수(삼성화재 인수분) → 비례(QS/Surplus) 출재 → 남은 보유분에 XOL 회수 → 최종 보유
+   Stop Loss는 연간 누적 손해율 기준이라 사고 단건에는 걸리지 않는다. */
+
+// 이 사고에서 삼성화재가 떠안는 원수 손해액 (재보험 반영 전)
+function grossLossToSF(inc, c){
+  if(!c) return 0;
+  const base = Math.max(0, (inc.propertyDamage.estimatedLossKRW || 0) - (c.deductible || 0));
+  return Math.round(base * (c.samsungShare.percentOfTotalPremium / 100));
+}
+
+// 사고 기준 손해 흐름
+function lossRetention(inc, c){
+  const gross = grossLossToSF(inc, c);
+  const ri = c && c.reinsurance;
+  if(!ri) return { gross, propCeded:0, netAfterProp:gross, layers:[], xolRecovery:0, net:gross };
+
+  const propCeded = Math.round(gross * (ri.cededRatio || 0));
+  const netAfterProp = gross - propCeded;
+
+  let xolRecovery = 0;
+  const layers = (ri.xolLayers || []).map(l => {
+    // 층은 보유손해가 부담개시점(attachment)을 넘는 부분만, 한도(limit)까지 회수한다
+    const rec = Math.max(0, Math.min(netAfterProp - l.attachmentKRW, l.limitKRW));
+    xolRecovery += rec;
+    return Object.assign({}, l, { recoveryKRW: rec });
+  });
+
+  return { gross, propCeded, netAfterProp, layers, xolRecovery, net: netAfterProp - xolRecovery };
+}
+
+// 연간 보험료 흐름
+function premiumRetention(c){
+  const gross = (c && c.grossPremiumKRW) || 0;
+  const ri = c && c.reinsurance;
+  if(!ri) return { gross, propCeded:0, commission:0, xolPremium:0, slPremium:0, net:gross, ratio: gross?1:0 };
+
+  const propCeded = Math.round(gross * (ri.cededRatio || 0));
+  const commission = Math.round(propCeded * ((ri.cedingCommissionPercent || 0) / 100));
+  const xolPremium = (ri.xolLayers || []).reduce((a, l) => a + (l.premiumKRW || 0), 0);
+  const slPremium = ri.stopLoss ? (ri.stopLoss.premiumKRW || 0) : 0;
+  const net = gross - propCeded + commission - xolPremium - slPremium;
+  return { gross, propCeded, commission, xolPremium, slPremium, net, ratio: gross ? net / gross : 0 };
+}
+
 // 손해율 구간별 색상: 50% 미만 양호 / 80% 미만 주의 / 그 이상 위험
 function lossRatioClass(pct){
   if(pct < 50) return "good";
@@ -1750,6 +1832,63 @@ function lossHistoryHtml(c){
   </div>`;
 }
 
+function reinsuranceHtml(c, inc){
+  const ri = c.reinsurance;
+  if(!ri) return "";
+  const pr = premiumRetention(c);
+  const lr = inc ? lossRetention(inc, c) : null;
+  const sl = ri.stopLoss;
+
+  const layerRows = (lr ? lr.layers : (ri.xolLayers || [])).map(l => `
+    <tr>
+      <td>${escapeHtml(l.name)}</td>
+      <td class="mono">${fmtKRW(l.limitKRW)} xs ${fmtKRW(l.attachmentKRW)}</td>
+      <td class="pct">ROL ${l.rateOnLinePercent}%</td>
+      <td class="pct">${lr ? (l.recoveryKRW > 0 ? `<b class="ceded">${fmtKRW(l.recoveryKRW)}</b>` : "—") : ""}</td>
+    </tr>`).join("");
+
+  return `<div class="reins">
+    <div class="lh-title">
+      <span>재보험 구조 및 보유</span>
+      <span class="lh-period">${escapeHtml(ri.structureLabel)}</span>
+    </div>
+
+    <dl class="kv-grid" style="font-size:12.5px;">
+      <dt>비례 재보험</dt><dd>${ri.quotaSharePercent ? `QS <b>${ri.quotaSharePercent}%</b> 출재` : ""}${ri.quotaSharePercent && ri.surplusLines ? " · " : ""}${ri.surplusLines ? `Surplus <b>${ri.surplusLines}선</b> (보유 1선 ${fmtKRW(ri.retentionLineKRW)})` : ""}${!ri.quotaSharePercent && !ri.surplusLines ? "없음 (비비례만 운영)" : ""}</dd>
+      <dt>비례 출재율</dt><dd><b class="ceded">${(ri.cededRatio*100).toFixed(1)}%</b> 출재 · <b class="retained">${(100 - ri.cededRatio*100).toFixed(1)}%</b> 보유 · 출재수수료 ${ri.cedingCommissionPercent}%</dd>
+      <dt>재보험자</dt><dd>${ri.reinsurers.map(escapeHtml).join(" · ")}</dd>
+      ${sl ? `<dt>Stop Loss</dt><dd>연간 누적 손해율 <b>${sl.attachLossRatioPercent}% 초과분 ${sl.limitLossRatioPercent}%p</b>까지 — 연간 기준이라 이 사고 단건에는 적용되지 않습니다.</dd>` : ""}
+    </dl>
+
+    ${layerRows ? `<div>
+      <div class="reins-sub">XOL 층 <span class="muted">(특약 단위 — 아래 금액은 특약 조건이고, 이 계약에는 배분 재보험료만 부담)</span></div>
+      <table class="coins-table reins-table">
+        <thead><tr><th>층</th><th>부담범위</th><th>요율</th><th>${lr ? "이 사고 회수" : ""}</th></tr></thead>
+        <tbody>${layerRows}</tbody>
+      </table>
+    </div>` : ""}
+
+    <div class="flow">
+      <div class="reins-sub">연간 보험료 — 보유보험료</div>
+      <div class="flow-row"><span>원수보험료 (삼성화재 인수분)</span><span class="mono">${fmtKRW(pr.gross)}</span></div>
+      <div class="flow-row minus"><span>− 비례 출재보험료</span><span class="mono">${fmtKRW(pr.propCeded)}</span></div>
+      <div class="flow-row plus"><span>+ 출재수수료 수입</span><span class="mono">${fmtKRW(pr.commission)}</span></div>
+      <div class="flow-row minus"><span>− XOL 재보험료 (배분)</span><span class="mono">${fmtKRW(pr.xolPremium)}</span></div>
+      ${pr.slPremium ? `<div class="flow-row minus"><span>− Stop Loss 재보험료 (배분)</span><span class="mono">${fmtKRW(pr.slPremium)}</span></div>` : ""}
+      <div class="flow-row total"><span>= 보유보험료</span><span class="mono">${fmtKRW(pr.net)} <span class="muted">(원수 대비 ${(pr.ratio*100).toFixed(1)}%)</span></span></div>
+    </div>
+
+    ${lr ? `<div class="flow">
+      <div class="reins-sub">이 사고 — 보유손해액</div>
+      <div class="flow-row"><span>발생손해 (삼성화재 인수분, 자기부담금 차감 후)</span><span class="mono">${fmtKRW(lr.gross)}</span></div>
+      <div class="flow-row minus"><span>− 비례 재보험 회수</span><span class="mono">${fmtKRW(lr.propCeded)}</span></div>
+      <div class="flow-row"><span>= 비례 출재 후 보유손해</span><span class="mono">${fmtKRW(lr.netAfterProp)}</span></div>
+      <div class="flow-row minus"><span>− XOL 회수</span><span class="mono">${lr.xolRecovery > 0 ? fmtKRW(lr.xolRecovery) : "0원 (부담개시점 미달)"}</span></div>
+      <div class="flow-row total"><span>= 보유손해액</span><span class="mono">${fmtKRW(lr.net)} <span class="muted">(발생손해 대비 ${lr.gross ? (lr.net/lr.gross*100).toFixed(1) : 0}%)</span></span></div>
+    </div>` : ""}
+  </div>`;
+}
+
 function contractCardHtml(c, inc){
   const coinsRows = c.coinsurance.map(r => `<tr><td>${escapeHtml(r.company)}</td><td class="pct">${r.percent}%</td></tr>`).join("");
   const t = c.contractType || {};
@@ -1780,9 +1919,10 @@ function contractCardHtml(c, inc){
         ${c.coverage.perBuilding ? `건물당 ${fmtKRW(c.coverage.perBuilding)} · ` : ""}${c.coverage.perPerson ? `인당 ${fmtKRW(c.coverage.perPerson)} · ` : ""}사고당 ${fmtKRW(c.coverage.perOccurrence)}
       </dd>
       <dt>자기부담금</dt><dd class="mono">${fmtKRW(c.deductible)}</dd>
-      <dt>재보험 출재</dt><dd>${c.reinsuranceCededPercent}%</dd>
+      <dt>원수보험료</dt><dd class="mono">${fmtKRW(c.grossPremiumKRW || 0)}</dd>
     </dl>
     ${lossHistoryHtml(c)}
+    ${reinsuranceHtml(c, inc)}
     ${c.coinsurance.length > 1 ? `<div><div class="section-title" style="margin-bottom:6px;">공동인수 구성</div><table class="coins-table">${coinsRows}</table></div>` : ""}
     <div class="uw-box">
       <div class="uw-avatar">${escapeHtml(c.underwriter.name.slice(0,1))}</div>
@@ -2035,6 +2175,56 @@ function buildLossHistory(years){
   };
 }
 
+// gen_state.py의 reinsurance_program()과 같은 구조를 만든다 (시뮬레이션 사고용)
+function buildReinsurance(sfLine, grossPremium){
+  const kind = pick(["QS","Surplus","QS+Surplus","QS+Surplus","XOL","QS"]);
+  let qs = 0, lines = 0, retentionLine = 0, ceded = 0;
+  if(kind.includes("QS")){ qs = pick([20,30,30,40,50]); ceded = qs/100; }
+  if(kind.includes("Surplus")){
+    lines = pick([2,3,4,5]);
+    const afterQs = sfLine * (1 - ceded);
+    retentionLine = Math.max(1, Math.round(afterQs / pick([2,3,4,5])));
+    let sc = afterQs ? Math.max(0, 1 - retentionLine/afterQs) : 0;
+    sc = Math.min(sc, lines/(lines+1));
+    ceded = ceded + (1 - ceded) * sc;
+  }
+  ceded = Math.min(Math.round(ceded*10000)/10000, 0.85);
+  const netPremium = grossPremium * (1 - ceded);
+
+  const layers = [];
+  let attach = pick([3000000000, 5000000000, 10000000000]);
+  const n = kind === "XOL" ? 2 : pick([1,2,2]);
+  for(let i=0;i<n;i++){
+    const limit = pick([10000000000,20000000000,30000000000,50000000000]) * (i+1);
+    const rol = Math.round((i===0 ? 9 + Math.random()*7 : 3 + Math.random()*4.5) * 10)/10;
+    layers.push({ name:`${i+1}층`, attachmentKRW:attach, limitKRW:limit, rateOnLinePercent:rol,
+                  treatyPremiumKRW: Math.round(limit*rol/100),
+                  premiumKRW: Math.round(netPremium * (0.03 + Math.random()*0.04)) });
+    attach += limit;
+  }
+  const stopLoss = Math.random() < 0.35 ? {
+    attachLossRatioPercent: pick([90,95,100,110]),
+    limitLossRatioPercent: pick([30,40,50]),
+    premiumKRW: Math.round(netPremium * (0.015 + Math.random()*0.025)),
+  } : null;
+
+  const label = [];
+  if(qs) label.push(`QS ${qs}%`);
+  if(lines) label.push(`Surplus ${lines}선`);
+  if(layers.length) label.push(`XOL ${layers.length}개층`);
+  if(stopLoss) label.push("Stop Loss");
+
+  return {
+    structureLabel: label.join(" + ") || "출재 없음",
+    kinds: [qs?"QS":null, lines?"Surplus":null, layers.length?"XOL":null, stopLoss?"StopLoss":null].filter(Boolean),
+    quotaSharePercent: qs, surplusLines: lines, retentionLineKRW: retentionLine,
+    cededRatio: ceded, cedingCommissionPercent: pick([15,18,20,22,25]),
+    reinsurers: ["Munich Re","Swiss Re","SCOR","Hannover Re","코리안리","Lloyd's Syndicate","Gen Re"]
+      .sort(() => Math.random()-0.5).slice(0, pick([2,3])),
+    xolLayers: layers, stopLoss,
+  };
+}
+
 function maybeBuildContract(scn){
   if(Math.random() < 0.4) return { matched:false, confidence:"낮음", contracts:[] };
   const held = randInt(20,70);
@@ -2044,6 +2234,7 @@ function maybeBuildContract(scn){
   const renewalCount = isNew ? 0 : 2026 - sinceYear;
   const lossHistory = isNew ? null : buildLossHistory(renewalCount);
   const sumInsured = randInt(20,300) * 100000000 * 10; // tens of billions range
+  const grossPremium = Math.round(sumInsured * held / 100 * (0.0008 + Math.random()*0.0027));
   const seq = String(1000 + randInt(0,8999));
   const products = ["재산종합보험(패키지)","화재보험","기업종합위험보험","건설공사보험(CAR)"];
   const companies = ["DB손해보험","현대해상","KB손해보험","메리츠화재","한화손해보험","롯데손해보험"];
@@ -2062,6 +2253,8 @@ function maybeBuildContract(scn){
       coinsurance: [{company:"삼성화재", percent:held}, {company:partner, percent:100-held}],
       deductible: 100000000 * randInt(1,10),
       reinsuranceCededPercent: randInt(0,30),
+      grossPremiumKRW: grossPremium,
+      reinsurance: buildReinsurance(sumInsured * held / 100, grossPremium),
       pastLossCount: lossHistory ? lossHistory.claimCount : 0,
       contractType: { isNew, sinceYear, renewalCount },
       lossHistory,
@@ -2134,11 +2327,9 @@ function advanceOne(inc){
   if(lc.actionCompleted){
     if(matched && !lc.claimPaid){
       const c = inc.samsungMatch.contracts[0];
-      const base = Math.max(0, (inc.propertyDamage.estimatedLossKRW || 0) - (c ? c.deductible : 0));
-      const share = c ? c.samsungShare.percentOfTotalPremium / 100 : 0;
       lc.claimPaid = true;
       lc.claimPaidAt = nowIso();
-      lc.claimAmountKRW = Math.round(base * share);
+      lc.claimAmountKRW = grossLossToSF(inc, c);   // 지급액은 재보험 반영 전 원수 기준
       return "closed";
     }
     return null;

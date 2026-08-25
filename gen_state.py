@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
+import random
+
+# 손으로 쓴 계약 12건도 재보험 프로그램이 필요한데 그때는 아직 대량생성용 rng가 없다.
+# 결과가 매번 같도록 여기도 시드를 고정한다.
+_fallback_rng = random.Random(19880417)
 
 def stage_history(stages_with_offsets, base_iso):
     # stages_with_offsets: list of (stage, minutes_after_base)
@@ -24,10 +29,101 @@ def loss_history(years, claims, incurred, largest, premium):
         "lossRatioPercent": round(incurred / premium * 100, 1) if premium else 0,
     }
 
+def reinsurance_program(sf_line, gross_premium, rng, kind=None):
+    """삼성화재 인수분(sf_line)에 얹는 재보험 프로그램을 만든다.
+
+    순서는 실제 출재 구조와 같다:
+      원수 → 비례(QS/Surplus)로 먼저 덜어내고 → 남은 보유분에 비비례(XOL)를 얹는다.
+    Stop Loss는 연간 누적 손해율 기준이라 사고 단건에는 걸리지 않고 프로그램 정보로만 둔다.
+    """
+    kind = kind or rng.choice(["QS", "Surplus", "QS+Surplus", "QS+Surplus", "XOL", "QS"])
+
+    qs_pct, surplus_lines, retention_line = 0, 0, 0
+    ceded = 0.0
+
+    if "QS" in kind:
+        qs_pct = rng.choice([20, 30, 30, 40, 50])
+        ceded = qs_pct / 100
+
+    if "Surplus" in kind:
+        # 보유 1선(line)을 정하고 그 위를 출재. 인수분이 1선보다 작으면 출재 없음.
+        surplus_lines = rng.choice([2, 3, 4, 5])
+        after_qs = sf_line * (1 - ceded)
+        retention_line = max(1, int(after_qs / rng.choice([2, 3, 4, 5])))
+        surplus_ceded = max(0.0, 1 - retention_line / after_qs) if after_qs else 0.0
+        # 초과액 재보험은 최대 surplus_lines 배까지만 받아준다
+        surplus_ceded = min(surplus_ceded, surplus_lines / (surplus_lines + 1))
+        ceded = ceded + (1 - ceded) * surplus_ceded
+
+    ceded = round(min(ceded, 0.85), 4)
+    net_line = sf_line * (1 - ceded)                    # 비례 출재 후 보유 인수액
+    net_premium = gross_premium * (1 - ceded)           # XOL 요율의 기준이 되는 보유보험료
+
+    # XOL·Stop Loss는 이 계약 하나가 아니라 포트폴리오 전체에 걸리는 특약이다.
+    # (한 계약의 보험료로 그 계약 전체를 덮는 층을 살 수는 없다)
+    # 그래서 층의 부담범위·요율은 특약 규모로 잡고, 이 계약에는 배분 재보험료만 매긴다.
+    xol = []
+    n_layers = 2 if kind == "XOL" else rng.choice([1, 2, 2])
+    attach = rng.choice([3000000000, 5000000000, 10000000000])      # 30억 / 50억 / 100억
+    for i in range(n_layers):
+        limit = rng.choice([10000000000, 20000000000, 30000000000, 50000000000]) * (i + 1)
+        rol = round(rng.uniform(9.0, 16.0) if i == 0 else rng.uniform(3.0, 7.5), 1)
+        xol.append({
+            "name": f"{i+1}층",
+            "attachmentKRW": attach,
+            "limitKRW": limit,
+            "rateOnLinePercent": rol,
+            "treatyPremiumKRW": int(limit * rol / 100),               # 특약 전체 재보험료
+            "premiumKRW": int(net_premium * rng.uniform(0.03, 0.07)), # 이 계약 배분분
+        })
+        attach = attach + limit                                       # 다음 층은 앞 층 위에서 시작
+
+    stop_loss = None
+    if rng.random() < 0.35:
+        stop_loss = {
+            "attachLossRatioPercent": rng.choice([90, 95, 100, 110]),
+            "limitLossRatioPercent": rng.choice([30, 40, 50]),
+            "premiumKRW": int(net_premium * rng.uniform(0.015, 0.04)),
+        }
+
+    kinds = []
+    if qs_pct: kinds.append("QS")
+    if surplus_lines: kinds.append("Surplus")
+    if xol: kinds.append("XOL")
+    if stop_loss: kinds.append("StopLoss")
+
+    label_parts = []
+    if qs_pct: label_parts.append(f"QS {qs_pct}%")
+    if surplus_lines: label_parts.append(f"Surplus {surplus_lines}선")
+    if xol: label_parts.append(f"XOL {len(xol)}개층")
+    if stop_loss: label_parts.append("Stop Loss")
+
+    return {
+        "structureLabel": " + ".join(label_parts) if label_parts else "출재 없음",
+        "kinds": kinds,
+        "quotaSharePercent": qs_pct,
+        "surplusLines": surplus_lines,
+        "retentionLineKRW": retention_line,
+        "cededRatio": ceded,
+        "cedingCommissionPercent": rng.choice([15, 18, 20, 22, 25]),
+        "reinsurers": rng.sample(["Munich Re", "Swiss Re", "SCOR", "Hannover Re",
+                                  "코리안리", "Lloyd's Syndicate", "Gen Re"], k=rng.choice([2, 3])),
+        "xolLayers": xol,
+        "stopLoss": stop_loss,
+    }
+
 def contract(policyNumber, product, policyholder, start, end, status,
              held, sharePct, sumInsured, lol, perBuilding, perPerson, perOccurrence,
              deductible, reins, pastLoss, coinsurance, uw_name, uw_phone, uw_email,
-             isNew=False, sinceYear=None, renewalCount=0, lossHistory=None):
+             isNew=False, sinceYear=None, renewalCount=0, lossHistory=None,
+             grossPremium=None, reinsurance=None, rng=None):
+    # 원수보험료(삼성화재 인수분)와 재보험 프로그램은 안 넘기면 여기서 만든다
+    sf_line = sumInsured * sharePct / 100
+    if grossPremium is None:
+        r = rng or _fallback_rng
+        grossPremium = int(sf_line * r.uniform(0.0008, 0.0035))
+    if reinsurance is None:
+        reinsurance = reinsurance_program(sf_line, grossPremium, rng or _fallback_rng)
     return {
         "policyNumber": policyNumber,
         "product": product,
@@ -41,6 +137,8 @@ def contract(policyNumber, product, policyholder, start, end, status,
         "coinsurance": coinsurance,
         "deductible": deductible,
         "reinsuranceCededPercent": reins,
+        "grossPremiumKRW": grossPremium,
+        "reinsurance": reinsurance,
         "pastLossCount": pastLoss,
         "contractType": {"isNew": isNew, "sinceYear": sinceYear, "renewalCount": renewalCount},
         "lossHistory": lossHistory,
@@ -374,7 +472,7 @@ incidents.append(incident(
 # 대량 더미 사고 생성 — 지도를 채우고 날짜 필터를 쓸 수 있을 만큼의 물량.
 # 시드를 고정해서 다시 돌려도 같은 결과가 나오게 한다.
 # ---------------------------------------------------------------------------
-import random
+
 from datetime import datetime, timedelta
 
 rng = random.Random(20260825)
@@ -610,7 +708,7 @@ def gen_bulk(n, start_seq):
                 sum_insured if rng.random() < 0.5 else None, None, sum_insured,
                 rng.randint(1, 20) * 100000000, rng.randint(0, 50), past,
                 coins, uw[0], uw[1], uw[2],
-                isNew=is_new, sinceYear=since, renewalCount=renewals, lossHistory=lh)]
+                isNew=is_new, sinceYear=since, renewalCount=renewals, lossHistory=lh, rng=rng)]
 
         # 매칭 건 중 일부는 이미 알림이 나갔고 일부는 검토도 끝났다
         alert_sent, alerts, reviewed, reviewed_by, reviewed_at = False, [], False, None, None
@@ -784,7 +882,7 @@ def gen_us(n, start_seq):
                 sum_insured if rng.random() < 0.5 else None, None, sum_insured,
                 rng.randint(5, 50) * 100000000, rng.randint(20, 70), past,
                 coins, uw[0], uw[1], uw[2],
-                isNew=is_new, sinceYear=since, renewalCount=renewals, lossHistory=lh)]
+                isNew=is_new, sinceYear=since, renewalCount=renewals, lossHistory=lh, rng=rng)]
 
         alert_sent, alerts, reviewed, reviewed_by, reviewed_at = False, [], False, None, None
         if matched and days_ago >= 1 and rng.random() < 0.6:
