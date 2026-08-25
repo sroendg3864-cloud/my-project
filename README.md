@@ -6,22 +6,26 @@
 
 - **배포 주소**: https://claude.ai/code/artifact/2c98808f-01ec-4ec7-a113-9476b844e8fa
 - **핵심 파일**: `app.html` — 이 파일 하나가 전부입니다 (HTML+CSS+JS, 지도 SVG와 초기 더미데이터가 플레이스홀더로 들어있음)
-- `gen_state.py` — 사고/계약 더미데이터 88건을 생성하는 스크립트 → `initial_state.json` 출력
+- `gen_state.py` — 사고/계약 더미데이터 122건(국내 88 + 미국 34)을 생성하는 스크립트 → `initial_state.json` 출력
 - `korea_map.json` — 대한민국 17개 시도 SVG 지도 좌표 데이터 (southkorea/southkorea-maps 리포의 GeoJSON을 단순화해서 변환)
-- `app_final.html` — `app.html`의 플레이스홀더(`__INITIAL_STATE_JSON__`, `__KOREA_MAP_JSON__`)를 실제 데이터로 치환해서 만든 최종 배포본. 빌드 방법은 아래 참고.
+- `usa_map.json` — 미국 본토 48개 주 지도 좌표. `build_usa_map.js`가 `us-atlas`의 TopoJSON을 같은 스키마로 변환해서 만듭니다
+- `app_final.html` — `app.html`의 플레이스홀더(`__INITIAL_STATE_JSON__`, `__KOREA_MAP_JSON__`, `__USA_MAP_JSON__`)를 실제 데이터로 치환해서 만든 최종 배포본. 빌드 방법은 아래 참고.
 - `test.js`, `test2.js`, `test3.js` — Playwright로 만든 스모크 테스트 (필터, 상세패널, 반응형, 다크모드 확인용)
 
 ### 빌드 방법 (app.html 수정 후 재배포 시)
 ```bash
 python3 gen_state.py   # initial_state.json 갱신 (더미데이터 바꿀 때만)
+# 미국 지도를 다시 만들 때만: npm i us-atlas topojson-client && node build_usa_map.js
 python3 - << 'EOF'
 import json
 html = open('app.html', encoding='utf-8').read()
 state = json.load(open('initial_state.json', encoding='utf-8'))
 korea = json.load(open('korea_map.json', encoding='utf-8'))
-sj = json.dumps(state, ensure_ascii=False, separators=(',',':')).replace('<', '\\u003C')
-kj = json.dumps(korea, ensure_ascii=False, separators=(',',':')).replace('<', '\\u003C')
-html2 = html.replace('__INITIAL_STATE_JSON__', sj).replace('__KOREA_MAP_JSON__', kj)
+usa   = json.load(open('usa_map.json', encoding='utf-8'))
+j = lambda o: json.dumps(o, ensure_ascii=False, separators=(',',':')).replace('<', '\\u003C')
+html2 = (html.replace('__INITIAL_STATE_JSON__', j(state))
+             .replace('__KOREA_MAP_JSON__', j(korea))
+             .replace('__USA_MAP_JSON__', j(usa)))
 open('app_final.html','w',encoding='utf-8').write(html2)
 EOF
 ```
@@ -30,6 +34,48 @@ EOF
 - 페이지 안에 `<script id="state-data" type="application/json">` 태그로 상태(사고 목록, 워크플로우, 알림 로그)를 통째로 담고 있습니다.
 - 뷰어가 뭔가를 바꾸면(검토완료, 메모, 알림 전송 클릭 등) `claude.use("artifact")` 캡슐화된 함수로 **페이지 전체를 다시 발행(publish)**해서 모든 뷰어에게 상태를 동기화합니다. (`artifact-capabilities` 문서 참고)
 - "10분마다 새 속보"는 브라우저 탭이 열려 있을 때만 동작하는 클라이언트 타이머입니다. **진짜 백엔드가 없어서** 아무도 안 보고 있으면 갱신되지 않습니다.
+
+## 국내 / 미국 지도 전환
+헤더의 `🇰🇷 국내` / `🇺🇸 미국` 토글로 지도와 목록 전체를 그 나라로 좁힙니다 (`activeCountry`).
+
+- 각 사고에 `country: "KR" | "US"` 가 붙고, `applyFilters()`가 현재 국가만 통과시킵니다.
+- 지도·피드·상단 통계·알림 현황·지역별 집계·종결 이력이 **모두 함께** 전환됩니다.
+- `MAPS = { KR: KOREA_MAP, US: USA_MAP }` 이고 `project()`는 활성 지도의 `proj`를 씁니다. 국가를 바꾸면 지도를 새로 그리고 확대 배율과 지역 선택도 초기화합니다.
+- 미국 지도는 **본토 48개 주**입니다. 알래스카·하와이는 뺐습니다 — equirectangular 투영이라 알래스카(경도 -179)를 넣으면 본토가 뭉개집니다. DC는 면적이 작아 단순화 과정에서 빠집니다.
+- 미국 사고 34건은 한국 기업의 미국 현지법인 공장을 가정하고, 조지아·앨라배마·테네시·텍사스·미시간 등 한국계 제조업이 몰린 30개 지점에 배치했습니다. 계약은 프론팅사(AIG/Chubb 등)가 끼는 글로벌 프로그램 형태라 삼성화재 보유비율이 10~60%로 낮습니다.
+- **금액은 전부 원화 환산 기준**입니다. 통화 필드를 따로 두지 않아 기존 집계·정렬이 그대로 동작합니다.
+
+## 사고 시점 담보 유효성 (`coverageAt()`)
+"사고가 났을 때 이 계약이 살아 있었나" — 협회 응대에서 제일 먼저 확인하는 값입니다.
+예전에는 보험기간을 **글자로만** 보여줘서 사람이 날짜를 눈으로 비교해야 했는데, 이제 계산합니다.
+
+- 사고일이 보험기간 안 → `사고시점 유효` (초록)
+- 사고일 > 만기일 → `⚠ 만기 후 사고` (빨강) — 담보 없음
+- 사고일 < 개시일 → `⚠ 사고 후 개시` (빨강) — 담보 없음
+- 계약 카드 헤더 배지 + "사고시점 담보" 항목에 판정 근거(사고일 vs 기간)를 함께 씁니다. 담보가 없는 건은 **피드 카드에도 빨간 경고 배지**가 붙고, 우선순위 점수도 크게 낮춥니다.
+- 더미 데이터는 `policy_period()`가 약 10%를 만기 후 사고, 7%를 사고 후 개시로 만들어 실제로 걸리는 케이스가 나오게 합니다.
+
+## 우선순위 정렬 (`priorityScore()`)
+피드 정렬을 `최신순` / `우선순위순` 중에 고릅니다. 점수는
+
+```
+(추정손해액 × 삼성화재 보유비율)/1억  +  사망×60 + 부상×6 + 실종×40
+  × 1.5 (미검토)  × 1.2 (알림 미발송)  × 0.15 (사고시점 담보 없음)
+```
+
+삼성화재가 실제로 부담할 금액을 축으로 두고, 아직 아무도 안 본 건을 위로 올립니다.
+
+## 담당자별 보기
+`전체 담당자` 드롭다운에서 프로를 고르면 그 담당자의 계약이 걸린 사고만 봅니다.
+목록은 **현재 국가의 사고에 실제로 등장하는 담당자**만 담습니다 (`populateUnderwriterFilter()`).
+
+## CSV 내보내기
+필터 영역의 `⤓ CSV 내보내기`가 **지금 보고 있는 목록**을 31개 컬럼으로 내보냅니다 (`CSV_COLS`).
+사고 기본정보 + 계약(증권번호·보험기간·사고시점담보·보유비율·계약구분·과거손해율) + 처리상태(조치완료·지급일·지급액)까지 들어갑니다.
+
+- 검색 중이면 **검색에 걸린 종결 건도 함께** 내보냅니다.
+- 엑셀에서 한글이 깨지지 않도록 BOM을 붙입니다.
+- Artifact의 `downloads` 캡슐이 있으면 파일로 저장하고, 없으면 클립보드로 복사합니다. **배포 시 파일 저장을 쓰려면 `capabilities: {downloads: true}` 선언이 필요합니다.**
 
 ## 화면 레이아웃 (웹 3단)
 넓은 화면에서는 **지도 / 속보 피드 / 사이드레일** 3단으로 펼쳐집니다 (`.layout`의 grid-template-areas).
@@ -54,7 +100,7 @@ lifecycle: { actionCompleted, actionCompletedAt, claimPaid, claimPaidAt, claimAm
 - 종결되면 **지도 핀·속보 피드·상단 통계·알림 현황에서 모두 빠지고**, 사이드레일의 **종결 이력**에서만 조회됩니다.
 - 종결 이력은 종결일 최신순 정렬이며 검색창이 있고, 행을 누르면 상세 패널이 열립니다.
 - 상세 패널에 **처리 상태** 항목이 추가돼 조치완료 시각 / 보험금 지급액·지급일 / 종결 여부를 보여줍니다.
-- 초기 더미 88건 중 **31건이 종결**, 57건이 진행중입니다.
+- 초기 더미 122건 중 **45건이 종결**(국내 37 · 미국 8), 77건이 진행중입니다.
 
 ### 자동 진행 (`advanceLifecycles()`)
 켜져 있는 동안 사고가 스스로 진행합니다: 대응단계를 한 칸씩 올리고 → 마지막 단계에서 **조치완료** → 연관건이면 **보험금 지급** → 종결.
@@ -94,8 +140,8 @@ lifecycle: { actionCompleted, actionCompletedAt, claimPaid, claimPaidAt, claimAm
 
 **주의**: 이 패널은 알림 상태를 **표시만** 합니다. 실제 메일/문자가 나가지는 않습니다 (기존 상세 패널의 "담당자에게 알림 전송" 버튼도 동일하게 시뮬레이션입니다).
 
-## 더미 사고 데이터 (88건)
-`gen_state.py`가 손으로 쓴 상세 사고 12건 + 자동 생성 76건 = **88건**을 만듭니다.
+## 더미 사고 데이터 (122건)
+`gen_state.py`가 손으로 쓴 상세 사고 12건 + 국내 자동 생성 76건 + 미국 34건 = **122건**을 만듭니다.
 
 - 자동 생성분은 전국 17개 시도 42개 지점(`SPOTS`)에 흩어지고, 좌표를 ±0.06도 흩뿌려 핀이 겹치지 않게 합니다.
 - 기간은 **2026-08-11 ~ 2026-08-25(14일)**. 최근일수록 촘촘하게 분포하고, 오래된 사고일수록 대응단계가 더 진행돼 있습니다.
@@ -111,6 +157,8 @@ lifecycle: { actionCompleted, actionCompletedAt, claimPaid, claimPaidAt, claimAm
 - 두 입력이 어떤 칩과 같으면 그 칩이 자동으로 활성화됩니다 (`detectPreset()`)
 - 아래에 `2026-08-23 ~ 2026-08-25 · 32건 (3일)` 형태의 요약이 표시됩니다 (`renderDateSummary()`)
 - 날짜 조건은 지도 핀 / 속보 피드 / 상단 통계 / 담당자 알림 현황 / 지역별 집계에 **모두 함께** 적용됩니다.
+
+**종결 건 검색**: 메인 검색은 진행중 사고만 훑지만, 검색어를 넣으면 **이미 종결된 건도 몇 건 걸리는지 피드 위에 알려주고** 바로 열 수 있는 링크를 답니다 (`closedSearchHits()`). 협회가 물어보는 사고가 이미 종결된 건인 경우가 흔해서 넣었습니다. 검색 대상에 증권번호·계약자·담당자·사고ID도 포함됩니다.
 
 **기준 날짜 주의**: 프리셋의 "오늘"은 실제 시계가 아니라 **데이터에서 가장 최근 사고 날짜**를 씁니다 (`dataToday()`).
 더미 데이터 날짜가 고정돼 있어서 실제 시계를 쓰면 "오늘"이 항상 0건이 되기 때문입니다.
@@ -152,3 +200,4 @@ Resend API + GitHub Actions(10분 cron)로 실제 자동 메일 발송까지 구
 - 추가로 채택된 기능: 담당자 자동 알림/워크플로우, 사고유형·업종 분류/필터, 대응단계 타임라인.
 - 이메일 자동 발송은 프로토타입 단계에 과하다고 판단해서 제외 — 대신 알림 현황 표시 패널만 더미데이터로 추가함.
 - 종결(조치완료+보험금지급)된 사고는 지도에서 내리고 종결 이력에서만 조회하도록 요청받음.
+- 해외는 미국 공장 위주로만 추가 — 한국 지도와 미국 지도를 전환하는 방식으로 요청받음.

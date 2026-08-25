@@ -56,9 +56,10 @@ def incident(id, occurredAt, title, itype, industry, address, region, lat, lng,
              stage, history, sourceNote, entityName, bizRegNo,
              matched, confidence, contracts, reviewed=False, reviewedBy=None, reviewedAt=None,
              assignedTo=None, notes=None, alertSent=False, alertLog=None,
-             lifecycle=None):
+             lifecycle=None, country="KR"):
     return {
         "id": id,
+        "country": country,          # "KR" | "US" — 지도 전환 단위
         "occurredAt": occurredAt,
         "title": title,
         "type": itype,
@@ -491,6 +492,25 @@ STAGE_SEQ = {
 
 BASE_DAY = datetime(2026, 8, 25, 9, 0, 0)   # 데이터 기준 "현재"
 
+def policy_period(occurred, rng):
+    """사고 발생일 기준 보험기간을 만든다.
+    대부분은 사고 시점에 유효하지만, 일부는 만기 후 사고이거나 사고 후 개시라
+    '사고 시점에 담보가 살아 있었는지' 판정이 실제로 걸리는 케이스가 생긴다."""
+    r = rng.random()
+    if r < 0.10:        # 만기 후 사고 — 사고 전에 계약이 끝났다
+        end = occurred - timedelta(days=rng.randint(5, 400))
+        start = end - timedelta(days=365)
+        status = "만기"
+    elif r < 0.17:      # 사고 후 개시 — 사고 뒤에 계약이 시작됐다
+        start = occurred + timedelta(days=rng.randint(3, 120))
+        end = start + timedelta(days=365)
+        status = "미개시"
+    else:               # 사고 시점에 유효
+        start = occurred - timedelta(days=rng.randint(20, 330))
+        end = start + timedelta(days=365)
+        status = "유효"
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"), status
+
 def gen_bulk(n, start_seq):
     """최근 14일에 걸쳐 사고 n건을 생성한다."""
     out = []
@@ -581,11 +601,11 @@ def gen_bulk(n, start_seq):
                       {"company": partner, "percent": 100 - held_pct}])
             sum_insured = rng.randint(10, 1500) * 100000000
             uw = rng.choice(UWS)
+            p_start, p_end, p_status = policy_period(occurred, rng)
             contracts = [contract(
                 f"SF-{rng.randint(2024,2026)}-{rng.choice(['FR','PK','CL','CR','EG','BD'])}-{rng.randint(100000,999999)}",
                 rng.choice(PRODUCTS), entity,
-                f"{rng.randint(2025,2026)}-{rng.randint(1,12):02d}-01",
-                f"{rng.randint(2026,2027)}-{rng.randint(1,12):02d}-28", "유효",
+                p_start, p_end, p_status,
                 True, held_pct, sum_insured, sum_insured,
                 sum_insured if rng.random() < 0.5 else None, None, sum_insured,
                 rng.randint(1, 20) * 100000000, rng.randint(0, 50), past,
@@ -643,7 +663,180 @@ def gen_bulk(n, start_seq):
         ))
     return out
 
+# ---------------------------------------------------------------------------
+# 미국 공장 사고 — 한국 기업의 미국 현지법인 공장을 삼성화재가 글로벌 프로그램으로
+# 인수한 상황을 가정한다. 금액은 전부 원화 환산 기준(더미).
+# ---------------------------------------------------------------------------
+
+# (주, 도시, 위도, 경도) — 한국계 제조업이 실제로 몰려 있는 지역 위주
+US_SITES = [
+    ("Georgia", "West Point", 32.8779, -85.1830),
+    ("Georgia", "Savannah", 32.0809, -81.0912),
+    ("Georgia", "Cartersville", 34.1651, -84.8001),
+    ("Alabama", "Montgomery", 32.3668, -86.3000),
+    ("Alabama", "Auburn", 32.6099, -85.4808),
+    ("Tennessee", "Clarksville", 36.5298, -87.3595),
+    ("Tennessee", "Chattanooga", 35.0456, -85.3097),
+    ("Texas", "Taylor", 30.5710, -97.4092),
+    ("Texas", "Austin", 30.2672, -97.7431),
+    ("Texas", "Houston", 29.7604, -95.3698),
+    ("Michigan", "Holland", 42.7875, -86.1089),
+    ("Michigan", "Detroit", 42.3314, -83.0458),
+    ("Ohio", "Toledo", 41.6528, -83.5379),
+    ("Ohio", "Columbus", 39.9612, -82.9988),
+    ("Indiana", "Kokomo", 40.4864, -86.1336),
+    ("Kentucky", "Bowling Green", 36.9685, -86.4808),
+    ("Kentucky", "Glendale", 37.6001, -85.9036),
+    ("South Carolina", "Greenville", 34.8526, -82.3940),
+    ("North Carolina", "Charlotte", 35.2271, -80.8431),
+    ("Arizona", "Casa Grande", 32.8795, -111.7574),
+    ("Arizona", "Phoenix", 33.4484, -112.0740),
+    ("California", "Fremont", 37.5485, -121.9886),
+    ("Illinois", "Chicago", 41.8781, -87.6298),
+    ("Wisconsin", "Milwaukee", 43.0389, -87.9065),
+    ("Iowa", "Des Moines", 41.5868, -93.6250),
+    ("Missouri", "Kansas City", 39.0997, -94.5786),
+    ("Louisiana", "Baton Rouge", 30.4515, -91.1871),
+    ("Washington", "Everett", 47.9790, -122.2021),
+    ("Pennsylvania", "Pittsburgh", 40.4406, -79.9959),
+    ("New York", "Buffalo", 42.8864, -78.8784),
+]
+
+# (사고유형, 업종, 제목 템플릿) — 공장 위주
+US_TEMPLATES = [
+    ("화재", "제조공장", "{city} 배터리 셀 공장 화재"),
+    ("화재", "제조공장", "{city} 자동차 부품공장 화재"),
+    ("화재", "물류창고", "{city} 물류센터 화재"),
+    ("폭발", "화학공장", "{city} 화학플랜트 폭발"),
+    ("폭발", "제조공장", "{city} 도장라인 분진 폭발"),
+    ("수재", "제조공장", "{city} 공장 폭우 침수"),
+    ("붕괴", "건설현장", "{city} 신축 공장동 붕괴"),
+    ("화재", "발전/에너지", "{city} 변전설비 화재"),
+]
+
+US_ENTITIES = [
+    "HanSung America Mfg.", "Dongjin USA Corp.", "Woosung Materials LLC",
+    "Sema Electronics America", "Taechang Precision Inc.", "Kumho Auto Parts USA",
+    "Cheongwoo Battery America", "Silla Chemical USA", "Hanbyul Energy Solutions",
+    "Seongjin Logistics America",
+]
+US_SOURCES = ["Reuters (더미)", "AP (더미)", "Local News (더미)", "Bloomberg (더미)", "WSJ (더미)"]
+US_PRODUCTS = ["해외재산종합보험(글로벌 프로그램)", "해외 기업종합위험보험",
+               "해외 건설공사보험(CAR)", "해외 배상책임보험"]
+US_FRONTING = ["AIG", "Chubb", "Zurich", "Liberty Mutual"]
+
+def gen_us(n, start_seq):
+    out = []
+    for k in range(n):
+        state, city, lat, lng = rng.choice(US_SITES)
+        itype, industry, tpl = rng.choice(US_TEMPLATES)
+        lat = round(lat + rng.uniform(-0.25, 0.25), 4)
+        lng = round(lng + rng.uniform(-0.25, 0.25), 4)
+
+        days_ago = min(13, int(abs(rng.gauss(0, 5))))
+        occurred = BASE_DAY - timedelta(days=days_ago, hours=rng.randint(0, 23),
+                                        minutes=rng.choice([0, 10, 20, 30, 40, 50]))
+        if occurred > BASE_DAY:
+            occurred = BASE_DAY - timedelta(minutes=45)
+        occ_iso = occurred.strftime("%Y-%m-%dT%H:%M:00")
+
+        seq = STAGE_SEQ[itype]
+        max_idx = min(len(seq) - 1, 1 + days_ago)
+        stage_idx = rng.randint(1, max_idx) if max_idx >= 1 else 0
+        offsets, acc = [], 0
+        for i in range(stage_idx + 1):
+            acc += 0 if i == 0 else rng.randint(5, 240) * (1 if i < 3 else 4)
+            offsets.append((seq[i], acc))
+        history = stage_history(offsets, occ_iso)
+
+        dead = rng.choice([0, 0, 0, 1, 2]) if itype in ("화재", "폭발", "붕괴") else 0
+        injured = rng.randint(0, 14)
+        loss_type = rng.choice(["분손", "분손(추정중)", "전손 추정"])
+        loss = rng.randint(20, 1800) * 100000000     # 해외 공장이라 규모가 크다
+        entity = rng.choice(US_ENTITIES)
+
+        matched = rng.random() < 0.62                # 해외 진출기업 위주라 매칭률이 높다
+        contracts, confidence = [], "낮음"
+        if matched:
+            confidence = rng.choice(["높음", "높음", "중간"])
+            is_new = rng.random() < 0.25
+            since = None if is_new else rng.randint(2012, 2024)
+            renewals = 0 if is_new else 2026 - since
+            lh, past = None, 0
+            if not is_new:
+                claims = rng.choice([0, 1, 1, 2, 3, 4])
+                premium = rng.randint(20, 900) * 100000000
+                incurred = int(premium * rng.randint(8, 100) / 100) if claims else 0
+                largest = int(incurred * rng.uniform(0.5, 0.9)) if claims else 0
+                lh = loss_history(renewals, claims, incurred, largest, premium)
+                past = claims
+            held_pct = rng.randint(10, 60)           # 프론팅사가 끼어 보유비율이 낮다
+            fronting = rng.choice(US_FRONTING)
+            coins = [{"company": "삼성화재", "percent": held_pct},
+                     {"company": f"{fronting} (프론팅)", "percent": 100 - held_pct}]
+            sum_insured = rng.randint(200, 4000) * 100000000
+            uw = rng.choice(UWS)
+            p_start, p_end, p_status = policy_period(occurred, rng)
+            contracts = [contract(
+                f"SF-GL-{rng.randint(2024,2026)}-{rng.randint(10000,99999)}",
+                rng.choice(US_PRODUCTS), entity, p_start, p_end, p_status,
+                True, held_pct, sum_insured, sum_insured,
+                sum_insured if rng.random() < 0.5 else None, None, sum_insured,
+                rng.randint(5, 50) * 100000000, rng.randint(20, 70), past,
+                coins, uw[0], uw[1], uw[2],
+                isNew=is_new, sinceYear=since, renewalCount=renewals, lossHistory=lh)]
+
+        alert_sent, alerts, reviewed, reviewed_by, reviewed_at = False, [], False, None, None
+        if matched and days_ago >= 1 and rng.random() < 0.6:
+            alert_sent = True
+            at = (occurred + timedelta(minutes=rng.randint(20, 180))).strftime("%Y-%m-%dT%H:%M:00")
+            u = contracts[0]["underwriter"]
+            alerts = alert_log(at, u["name"], u["email"])
+            if rng.random() < 0.45:
+                reviewed = True
+                reviewed_by = "기업보상팀 " + rng.choice(UWS)[0]
+                reviewed_at = (occurred + timedelta(hours=rng.randint(3, 40))).strftime("%Y-%m-%dT%H:%M:00")
+
+        lc = {"actionCompleted": False, "actionCompletedAt": None,
+              "claimPaid": False, "claimPaidAt": None, "claimAmountKRW": None}
+        if days_ago >= 3 and rng.random() < min(0.7, 0.14 * days_ago):
+            done_at = occurred + timedelta(days=rng.randint(1, max(1, days_ago)))
+            if done_at > BASE_DAY:
+                done_at = BASE_DAY - timedelta(hours=rng.randint(2, 14))
+            if done_at < occurred:
+                done_at = occurred + timedelta(hours=2)
+            lc["actionCompleted"] = True
+            lc["actionCompletedAt"] = done_at.strftime("%Y-%m-%dT%H:%M:00")
+            room = (BASE_DAY - done_at).total_seconds() / 3600
+            if matched and room >= 6 and rng.random() < 0.6:
+                paid_at = done_at + timedelta(hours=rng.randint(4, max(5, int(room))))
+                if paid_at > BASE_DAY:
+                    paid_at = BASE_DAY
+                lc["claimPaid"] = True
+                lc["claimPaidAt"] = paid_at.strftime("%Y-%m-%dT%H:%M:00")
+                ded = contracts[0]["deductible"]
+                share = contracts[0]["samsungShare"]["percentOfTotalPremium"] / 100
+                base = max(0, loss - ded)
+                lc["claimAmountKRW"] = int(base * share) if base else 0
+
+        out.append(incident(
+            id=f"INC-US-{occurred.strftime('%Y%m%d')}-{start_seq + k:03d}",
+            occurredAt=occ_iso, title=tpl.format(city=city), itype=itype, industry=industry,
+            address=f"{city}, {state}, USA", region=state, lat=lat, lng=lng,
+            dead=dead, injured=injured, missing=0,
+            lossType=loss_type, estimatedLossKRW=loss,
+            damageNote="현지 소방·당국 대응 중, 세부 피해규모 확인 중 (원화 환산 기준)",
+            stage=history[-1]["stage"], history=history,
+            sourceNote=rng.choice(US_SOURCES), entityName=entity,
+            bizRegNo=f"EIN {rng.randint(10,99)}-{rng.randint(1000000,9999999)}",
+            matched=matched, confidence=confidence, contracts=contracts,
+            reviewed=reviewed, reviewedBy=reviewed_by, reviewedAt=reviewed_at,
+            alertSent=alert_sent, alertLog=alerts, lifecycle=lc, country="US",
+        ))
+    return out
+
 incidents.extend(gen_bulk(76, 100))
+incidents.extend(gen_us(34, 500))
 incidents.sort(key=lambda i: i["occurredAt"], reverse=True)
 
 state = {

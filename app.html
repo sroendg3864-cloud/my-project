@@ -420,6 +420,24 @@
   .badge.nomatch{ background:var(--surface-2); color:var(--ink-faint); }
   .badge.reviewed{ background:var(--success-soft); color:var(--success); }
   .badge.newpol{ background:var(--accent-soft); color:var(--accent-strong); }
+  .badge.cov-warn{ background:var(--danger); color:#fff; font-weight:700; }
+  .pill-cov-valid{ background:var(--success-soft); color:var(--success); }
+  .pill-cov-expired, .pill-cov-notyet{ background:var(--danger); color:#fff; }
+  dd.cov-valid{ color:var(--success); }
+  dd.cov-expired, dd.cov-notyet{ color:var(--danger); }
+
+  .closed-hit{
+    background:var(--warning-soft); border:1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+    border-radius:var(--radius); padding:10px 12px; font-size:12.5px; color:var(--warning);
+    display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; margin-bottom:10px;
+  }
+  .closed-hit-link{
+    font-family:inherit; font-size:12px; cursor:pointer; color:var(--warning);
+    background:var(--surface); border:1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+    border-radius:6px; padding:2px 7px;
+  }
+  .closed-hit-link:hover{ background:var(--surface-2); }
+  .closed-hit .muted{ color:var(--ink-faint); font-size:11.5px; }
   .badge.renewpol{ background:var(--surface-2); color:var(--ink-dim); }
   .ci-stats{ display:flex; gap:16px; margin-top:9px; font-size:12.5px; color:var(--ink-dim); flex-wrap:wrap; }
   .ci-stats b{ color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600; }
@@ -551,6 +569,10 @@
       </div>
     </div>
     <div class="status-cluster">
+      <div class="seg" id="countrySwitch">
+        <button class="seg-btn active" data-country="KR">🇰🇷 국내</button>
+        <button class="seg-btn" data-country="US">🇺🇸 미국</button>
+      </div>
       <span class="live-pill" id="livePill"><span class="live-dot pulse" id="liveDot"></span><span id="liveText">자동 갱신 중 · 10분 간격</span></span>
       <span class="live-pill" id="lastUpdatedPill">마지막 업데이트 —</span>
       <button class="btn" id="btnDemoFast" title="사고 발생·조치완료를 빠르게 돌려 동작을 확인합니다">▶ 시연 모드</button>
@@ -605,6 +627,13 @@
           <select id="filterStage"></select>
         </div>
         <div class="filter-row">
+          <select id="filterUnderwriter" title="담당 프로별로 봅니다"></select>
+          <select id="sortMode" title="피드 정렬 기준">
+            <option value="recent">최신순</option>
+            <option value="priority">우선순위순</option>
+          </select>
+        </div>
+        <div class="filter-row">
           <div class="search-wrap"><input type="search" id="filterSearch" placeholder="사고 제목·지역·업체명 검색"></div>
         </div>
         <div class="date-filter">
@@ -625,6 +654,9 @@
         <div class="filter-row">
           <label class="toggle" id="toggleMatchedOnly"><input type="checkbox" id="chkMatchedOnly"><span>삼성화재 관련만 보기</span></label>
           <label class="toggle" id="toggleUnreviewedOnly"><input type="checkbox" id="chkUnreviewedOnly"><span>미검토만 보기</span></label>
+        </div>
+        <div class="filter-row">
+          <button class="btn ghost small" id="btnExportCsv" title="지금 보고 있는 목록을 CSV로 내보냅니다">⤓ CSV 내보내기</button>
         </div>
       </div>
     </section>
@@ -678,6 +710,9 @@
 <script id="state-data" type="application/json">__INITIAL_STATE_JSON__</script>
 <script>
 const KOREA_MAP = __KOREA_MAP_JSON__;
+const USA_MAP = __USA_MAP_JSON__;
+const MAPS = { KR: KOREA_MAP, US: USA_MAP };
+const COUNTRY_LABEL = { KR: "국내", US: "미국" };
 </script>
 <script>
 "use strict";
@@ -719,9 +754,14 @@ let RAW_TEMPLATE = null;
 let ARTIFACT = null;
 let CAN_WRITE = true;
 let liveTimer = null;
-let uiFilters = { type:"all", stage:"all", search:"", matchedOnly:false, unreviewedOnly:false, dateFrom:"", dateTo:"", region:"" };
+let uiFilters = { type:"all", stage:"all", search:"", matchedOnly:false, unreviewedOnly:false, dateFrom:"", dateTo:"", region:"", underwriter:"" };
 let mapMode = "pin";        // "pin" | "region"
 let historySearch = "";
+let activeCountry = "KR";   // "KR" | "US" — 지도와 목록 전체를 이 나라로 좁힌다
+let sortMode = "recent";    // "recent" | "priority"
+
+function activeMap(){ return MAPS[activeCountry]; }
+function countryOf(inc){ return inc.country || "KR"; }
 let openDetailId = null;
 
 function loadInitialState(){
@@ -841,7 +881,7 @@ function closedIncidents(){
 /* ---------------- rendering: map ---------------- */
 
 function project(lat, lng){
-  const p = KOREA_MAP.proj;
+  const p = activeMap().proj;
   const x = (lng - p.minlon) * p.cosf * p.scale + p.offx;
   const y = (p.maxlat - lat) * p.scale + p.offy;
   return [x,y];
@@ -849,9 +889,10 @@ function project(lat, lng){
 
 function renderMapBase(){
   const svg = document.getElementById("koreaMap");
-  svg.setAttribute("viewBox", KOREA_MAP.viewBox);
+  const MAP = activeMap();
+  svg.setAttribute("viewBox", MAP.viewBox);
   let paths = "";
-  KOREA_MAP.provinces.forEach(p => {
+  MAP.provinces.forEach(p => {
     paths += `<path class="province" d="${p.d}" data-code="${p.code}" data-name="${escapeHtml(p.name)}"><title>${escapeHtml(p.name)}</title></path>`;
   });
   svg.innerHTML = `<g id="provinces">${paths}</g><g id="pins"></g>`;
@@ -861,7 +902,7 @@ function renderMapBase(){
       toggleRegion(el.dataset.name);
     });
   });
-  mapBase = KOREA_MAP.viewBox.split(/\s+/).map(Number);
+  mapBase = MAP.viewBox.split(/\s+/).map(Number);
   mapView = [...mapBase];
 }
 
@@ -949,6 +990,20 @@ function renderRegionStats(list){
   });
 }
 
+function switchCountry(code){
+  if(code === activeCountry) return;
+  activeCountry = code;
+  uiFilters.region = "";                 // 지역 선택은 지도가 바뀌면 의미가 없다
+  closeDetail();
+  document.querySelectorAll("#countrySwitch .seg-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.country === code));
+  renderMapBase();                       // 지도 자체를 갈아끼우고 확대도 초기화
+  if(mapMode === "pin") clearChoropleth();
+  populateUnderwriterFilter();
+  updateMapZoomUI();
+  render();
+}
+
 function toggleRegion(name){
   uiFilters.region = (normRegion(uiFilters.region) === name) ? "" : name;
   render();
@@ -957,7 +1012,8 @@ function toggleRegion(name){
 /* ---------------- 종결 이력 ---------------- */
 
 function renderHistory(){
-  const all = closedIncidents();
+  // 종결 이력도 나머지 화면과 같이 현재 보고 있는 나라로 좁힌다
+  const all = closedIncidents().filter(i => countryOf(i) === activeCountry);
   const q = historySearch.trim().toLowerCase();
   const rows = q
     ? all.filter(i => (i.title + " " + i.location.region + " " + i.relatedEntity.name).toLowerCase().includes(q))
@@ -1151,10 +1207,39 @@ function populateFilters(){
   const stageSel = document.getElementById("filterStage");
   const groups = ["all","초동","대응/진압","초기수습","조사","후속조치"];
   stageSel.innerHTML = groups.map(g => `<option value="${g}">${g==="all"?"전체 대응단계":g}</option>`).join("");
+
+  populateUnderwriterFilter();
+}
+
+// 담당자 목록은 현재 국가의 사고에 실제로 등장하는 프로만 담는다
+function populateUnderwriterFilter(){
+  const sel = document.getElementById("filterUnderwriter");
+  const names = new Set();
+  STATE.incidents.forEach(i => {
+    if(countryOf(i) !== activeCountry) return;
+    (i.samsungMatch.contracts || []).forEach(c => names.add(c.underwriter.name));
+  });
+  const sorted = [...names].sort((a,b) => a.localeCompare(b, "ko"));
+  if(uiFilters.underwriter && !names.has(uiFilters.underwriter)) uiFilters.underwriter = "";
+  sel.innerHTML = `<option value="">전체 담당자</option>` +
+    sorted.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  sel.value = uiFilters.underwriter;
+}
+
+function matchesSearch(inc, q){
+  const hay = (inc.title + " " + inc.location.region + " " + inc.location.address + " " +
+               inc.relatedEntity.name + " " + inc.id + " " +
+               ((inc.samsungMatch.contracts || []).map(c =>
+                  c.policyNumber + " " + c.policyholder + " " + c.underwriter.name).join(" "))
+              ).toLowerCase();
+  return hay.includes(q);
 }
 
 function applyFilters(list){
   return list.filter(inc => {
+    if(countryOf(inc) !== activeCountry) return false;
+    if(uiFilters.underwriter && !(inc.samsungMatch.contracts || [])
+        .some(c => c.underwriter.name === uiFilters.underwriter)) return false;
     if(uiFilters.type !== "all" && inc.type !== uiFilters.type) return false;
     if(uiFilters.stage !== "all" && STAGE_GROUP.group(inc.responseStage) !== uiFilters.stage) return false;
     if(uiFilters.matchedOnly && !(inc.samsungMatch && inc.samsungMatch.matched)) return false;
@@ -1164,13 +1249,89 @@ function applyFilters(list){
     if(uiFilters.dateFrom && day < uiFilters.dateFrom) return false;
     if(uiFilters.dateTo && day > uiFilters.dateTo) return false;
     if(uiFilters.region && normRegion(inc.location.region) !== normRegion(uiFilters.region)) return false;
-    if(uiFilters.search){
-      const q = uiFilters.search.toLowerCase();
-      const hay = (inc.title + " " + inc.location.region + " " + inc.location.address + " " + inc.relatedEntity.name).toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
+    if(uiFilters.search && !matchesSearch(inc, uiFilters.search.toLowerCase())) return false;
     return true;
   });
+}
+
+// 검색어를 넣었을 때, 이미 종결돼 지도·피드에서 내려간 건도 몇 건 걸리는지 알려준다.
+// (협회에서 물어보는 사고가 이미 종결된 건인 경우가 흔하다)
+function closedSearchHits(){
+  if(!uiFilters.search) return [];
+  const q = uiFilters.search.toLowerCase();
+  return closedIncidents().filter(inc => countryOf(inc) === activeCountry && matchesSearch(inc, q));
+}
+
+/* ---------------- CSV 내보내기 ---------------- */
+
+const CSV_COLS = [
+  ["사고ID",       i => i.id],
+  ["국가",         i => COUNTRY_LABEL[countryOf(i)]],
+  ["발생일시",     i => i.occurredAt.replace("T", " ")],
+  ["사고명",       i => i.title],
+  ["유형",         i => i.type],
+  ["업종",         i => i.industry],
+  ["지역",         i => i.location.region],
+  ["주소",         i => i.location.address],
+  ["사망",         i => i.casualties.dead],
+  ["부상",         i => i.casualties.injured],
+  ["실종",         i => i.casualties.missing],
+  ["손해형태",     i => i.propertyDamage.lossType],
+  ["추정손해액(원)", i => i.propertyDamage.estimatedLossKRW ?? ""],
+  ["대응단계",     i => i.responseStage],
+  ["삼성화재연관", i => (i.samsungMatch && i.samsungMatch.matched) ? "Y" : "N"],
+  ["매칭신뢰도",   i => i.samsungMatch.confidence || ""],
+  ["증권번호",     i => (i.samsungMatch.contracts[0] || {}).policyNumber || ""],
+  ["보험상품",     i => (i.samsungMatch.contracts[0] || {}).product || ""],
+  ["계약자",       i => (i.samsungMatch.contracts[0] || {}).policyholder || ""],
+  ["보험기간",     i => { const c = i.samsungMatch.contracts[0]; return c ? `${c.policyPeriod.start}~${c.policyPeriod.end}` : ""; }],
+  ["사고시점담보", i => { const c = coverageOf(i); return c ? c.label : ""; }],
+  ["보유비율(%)",  i => { const c = i.samsungMatch.contracts[0]; return c ? c.samsungShare.percentOfTotalPremium : ""; }],
+  ["계약구분",     i => { const c = i.samsungMatch.contracts[0]; if(!c || !c.contractType) return ""; return c.contractType.isNew ? "신규" : `갱신 ${c.contractType.renewalCount}회`; }],
+  ["과거손해율(%)",i => { const c = i.samsungMatch.contracts[0]; return c && c.lossHistory ? c.lossHistory.lossRatioPercent : ""; }],
+  ["담당자",       i => { const c = i.samsungMatch.contracts[0]; return c ? c.underwriter.name : ""; }],
+  ["검토완료",     i => i.workflow.reviewed ? "Y" : "N"],
+  ["알림발송",     i => i.workflow.alertSent ? "Y" : "N"],
+  ["조치완료",     i => ensureLifecycle(i).actionCompletedAt || ""],
+  ["보험금지급",   i => ensureLifecycle(i).claimPaidAt || ""],
+  ["지급액(원)",   i => ensureLifecycle(i).claimAmountKRW ?? ""],
+  ["상태",         i => isClosed(i) ? "종결" : "진행중"],
+];
+
+function csvCell(v){
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildCsv(list){
+  const head = CSV_COLS.map(c => csvCell(c[0])).join(",");
+  const rows = list.map(i => CSV_COLS.map(c => csvCell(c[1](i))).join(","));
+  return [head, ...rows].join("\r\n");
+}
+
+async function exportCsv(){
+  // 지금 보고 있는 목록 + 검색에 걸린 종결 건까지 함께 내보낸다
+  const list = [...applyFilters(liveIncidents()), ...closedSearchHits()];
+  if(!list.length){ showToast("내보낼 사고가 없습니다.", false); return; }
+  const csv = "﻿" + buildCsv(list);   // BOM: 엑셀에서 한글이 깨지지 않게
+
+  try{
+    const dl = window.claude ? await window.claude.use("downloads") : null;
+    if(dl){
+      await dl.save({ filename: `incident-radar-${activeCountry}-${dataToday()}.csv`, data: csv });
+      showToast(`${list.length}건을 CSV로 저장했습니다.`, false);
+      return;
+    }
+  }catch(err){
+    console.warn("download failed", err);
+  }
+  // 저장을 못 쓰는 환경이면 클립보드로 떨군다 (엑셀에 그대로 붙여넣기 가능)
+  try{
+    await navigator.clipboard.writeText(csv);
+    showToast(`${list.length}건을 클립보드에 복사했습니다. 엑셀에 붙여넣으세요.`, false);
+  }catch(_){
+    showToast("내보내기에 실패했습니다.", false);
+  }
 }
 
 /* ---------------- date filter ---------------- */
@@ -1246,16 +1407,55 @@ function renderDateSummary(list){
 function renderFeed(list){
   const wrap = document.getElementById("feedList");
   const countEl = document.getElementById("feedCount");
-  countEl.textContent = `${list.length}건 표시 중 (전체 ${STATE.incidents.length}건)`;
+  const inCountry = STATE.incidents.filter(i => countryOf(i) === activeCountry).length;
+  countEl.textContent = `${list.length}건 표시 중 (${COUNTRY_LABEL[activeCountry]} 전체 ${inCountry}건)`;
+
+  // 검색 중이면 종결된 건도 몇 건 걸리는지 알려준다
+  const closedHits = closedSearchHits();
+  const closedNote = closedHits.length
+    ? `<div class="closed-hit">검색어에 맞는 <b>종결된 사고 ${closedHits.length}건</b>이 더 있습니다.
+         ${closedHits.slice(0,5).map(i =>
+           `<button class="closed-hit-link" data-id="${escapeHtml(i.id)}">${escapeHtml(i.title)}</button>`).join("")}
+         ${closedHits.length > 5 ? `<span class="muted">외 ${closedHits.length - 5}건</span>` : ""}</div>`
+    : "";
+
   if(list.length === 0){
-    wrap.innerHTML = `<div class="empty-state">조건에 맞는 사고가 없습니다.</div>`;
+    wrap.innerHTML = closedNote + `<div class="empty-state">조건에 맞는 진행중 사고가 없습니다.</div>`;
+    wireClosedHits(wrap);
     return;
   }
-  const sorted = [...list].sort((a,b) => new Date(b.occurredAt) - new Date(a.occurredAt));
-  wrap.innerHTML = sorted.map(inc => feedCardHtml(inc)).join("");
+  const sorted = [...list].sort(sortMode === "priority"
+    ? (a,b) => priorityScore(b) - priorityScore(a)
+    : (a,b) => new Date(b.occurredAt) - new Date(a.occurredAt));
+  wrap.innerHTML = closedNote + sorted.map(inc => feedCardHtml(inc)).join("");
+  wireClosedHits(wrap);
   wrap.querySelectorAll(".card-incident").forEach(el => {
     el.addEventListener("click", () => openDetail(el.getAttribute("data-id")));
   });
+}
+
+function wireClosedHits(wrap){
+  wrap.querySelectorAll(".closed-hit-link").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); openDetail(b.dataset.id); });
+  });
+}
+
+/* 우선순위 점수 — 먼저 봐야 할 건을 위로 올린다.
+   삼성화재가 실제로 부담할 금액(추정손해액 × 보유비율)을 축으로 두고,
+   인명피해와 미검토 여부로 가중한다. 사고 시점에 담보가 없으면 크게 낮춘다. */
+function priorityScore(inc){
+  const matched = inc.samsungMatch && inc.samsungMatch.matched;
+  if(!matched) return 0;
+  const c = inc.samsungMatch.contracts[0];
+  const share = c ? c.samsungShare.percentOfTotalPremium / 100 : 0;
+  const exposureEok = ((inc.propertyDamage.estimatedLossKRW || 0) * share) / 100000000;
+  let score = exposureEok;
+  score += (inc.casualties.dead * 60) + (inc.casualties.injured * 6) + (inc.casualties.missing * 40);
+  if(!inc.workflow.reviewed) score *= 1.5;          // 아직 아무도 안 본 건을 위로
+  if(!inc.workflow.alertSent) score *= 1.2;
+  const cov = coverageOf(inc);
+  if(cov && cov.state !== "valid") score *= 0.15;   // 담보 없는 건은 아래로
+  return score;
 }
 
 // 피드 카드용: 연관 계약이 신규인지 갱신인지, 갱신이면 손해율까지 한 줄로.
@@ -1274,6 +1474,7 @@ function feedCardHtml(inc){
   const matched = inc.samsungMatch && inc.samsungMatch.matched;
   const cas = inc.casualties;
   const isNew = justAddedIds.has(inc.id);
+  const cov = matched ? coverageOf(inc) : null;
   return `<div class="card-incident${isNew?" new":""}" data-id="${inc.id}">
     <div class="ci-top">
       <div class="ci-title">${escapeHtml(inc.title)}</div>
@@ -1284,6 +1485,7 @@ function feedCardHtml(inc){
       <span class="badge type">${inc.type} · ${inc.industry}</span>
       <span class="badge stage">${escapeHtml(inc.responseStage)}</span>
       ${matched ? `<span class="badge match">🔺 삼성화재 연관</span>` : `<span class="badge nomatch">연관 없음</span>`}
+      ${matched && cov && cov.state !== "valid" ? `<span class="badge cov-warn">${cov.short}</span>` : ""}
       ${matched ? policyBadgeHtml(inc) : ""}
       ${inc.workflow.reviewed ? `<span class="badge reviewed">검토완료</span>` : ""}
     </div>
@@ -1380,6 +1582,27 @@ function stepperHtml(history, currentStage){
     </div>`).join("") + `</div>`;
 }
 
+/* ---------------- 사고 시점 담보 유효성 ----------------
+   "사고가 났을 때 이 계약이 살아 있었나"는 협회 응대에서 제일 먼저 확인하는 값인데
+   보험기간을 글자로만 보여주면 사람이 날짜를 눈으로 비교해야 한다. 여기서 판정한다. */
+
+function coverageAt(inc, c){
+  if(!c || !c.policyPeriod) return null;
+  const day = inc.occurredAt.slice(0,10);
+  const { start, end } = c.policyPeriod;
+  if(start && day < start) return { state:"notyet", label:"사고 후 개시", short:"⚠ 사고 후 개시" };
+  if(end && day > end)     return { state:"expired", label:"만기 후 사고", short:"⚠ 만기 후 사고" };
+  return { state:"valid", label:"사고시점 유효", short:"사고시점 유효" };
+}
+
+// 연관 계약 중 하나라도 사고 시점에 유효하면 그 사고는 "담보 있음"으로 본다
+function coverageOf(inc){
+  const cs = (inc.samsungMatch && inc.samsungMatch.contracts) || [];
+  if(!cs.length) return null;
+  const states = cs.map(c => coverageAt(inc, c)).filter(Boolean);
+  return states.find(s => s.state === "valid") || states[0] || null;
+}
+
 // 손해율 구간별 색상: 50% 미만 양호 / 80% 미만 주의 / 그 이상 위험
 function lossRatioClass(pct){
   if(pct < 50) return "good";
@@ -1430,9 +1653,10 @@ function lossHistoryHtml(c){
   </div>`;
 }
 
-function contractCardHtml(c){
+function contractCardHtml(c, inc){
   const coinsRows = c.coinsurance.map(r => `<tr><td>${escapeHtml(r.company)}</td><td class="pct">${r.percent}%</td></tr>`).join("");
   const t = c.contractType || {};
+  const cov = inc ? coverageAt(inc, c) : null;
   return `<div class="contract-card">
     <div class="contract-head">
       <div>
@@ -1441,12 +1665,17 @@ function contractCardHtml(c){
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">
         ${contractTypeHtml(c)}
-        <span class="pill-status ${c.status}">${c.status}</span>
+        ${cov ? `<span class="pill-status pill-cov-${cov.state}">${cov.short}</span>` : ""}
       </div>
     </div>
     <dl class="kv-grid">
       <dt>계약 구분</dt><dd>${t.isNew ? "신규 계약 (최초 인수)" : `갱신 계약 · <b>${t.sinceYear}년</b>부터 <b>${t.renewalCount}회</b> 갱신`}</dd>
       <dt>보험기간</dt><dd class="mono">${c.policyPeriod.start} ~ ${c.policyPeriod.end}</dd>
+      ${cov ? `<dt>사고시점 담보</dt><dd class="cov-${cov.state}">${cov.state === "valid"
+        ? `<b>유효</b> — 사고일(${inc.occurredAt.slice(0,10)})이 보험기간 안에 있습니다.`
+        : cov.state === "expired"
+          ? `<b>만기 후 사고</b> — 사고일(${inc.occurredAt.slice(0,10)})이 만기일 이후입니다. 담보 없음.`
+          : `<b>사고 후 개시</b> — 계약 시작일이 사고일(${inc.occurredAt.slice(0,10)})보다 늦습니다. 담보 없음.`}</dd>` : ""}
       <dt>삼성화재 보유</dt><dd>${c.samsungShare.held ? `보유 · 전체 보험료의 <b class="mono">${c.samsungShare.percentOfTotalPremium}%</b>` : "미보유"}</dd>
       <dt>보험가입금액</dt><dd class="mono">${fmtKRW(c.sumInsured)}</dd>
       <dt>LOL(배상한도)</dt><dd class="mono">${fmtKRW(c.lol)}</dd>
@@ -1536,7 +1765,7 @@ function renderDetail(){
 
       <div>
         <div class="section-title">삼성화재 계약 매칭 <span class="demo-tag" style="margin-left:6px;">가상 계약데이터</span></div>
-        ${matched ? inc.samsungMatch.contracts.map(contractCardHtml).join("") : `<div class="empty-state" style="padding:16px;">현재 삼성화재 보유 계약과 매칭되지 않았습니다.</div>`}
+        ${matched ? inc.samsungMatch.contracts.map(c => contractCardHtml(c, inc)).join("") : `<div class="empty-state" style="padding:16px;">현재 삼성화재 보유 계약과 매칭되지 않았습니다.</div>`}
       </div>
 
       <div>
@@ -1921,6 +2150,16 @@ function wireEvents(){
     render();
   });
   document.getElementById("btnDateClear").addEventListener("click", () => applyDatePreset("all"));
+  document.getElementById("filterUnderwriter").addEventListener("change", e => {
+    uiFilters.underwriter = e.target.value; render();
+  });
+  document.getElementById("sortMode").addEventListener("change", e => {
+    sortMode = e.target.value; render();
+  });
+  document.getElementById("btnExportCsv").addEventListener("click", exportCsv);
+  document.querySelectorAll("#countrySwitch .seg-btn").forEach(b => {
+    b.addEventListener("click", () => switchCountry(b.dataset.country));
+  });
   document.querySelectorAll("#mapModes .seg-btn").forEach(b => {
     b.addEventListener("click", () => {
       mapMode = b.dataset.mode;
