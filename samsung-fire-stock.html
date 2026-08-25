@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>삼성화재_주식현황판.xlsx - Excel</title>
+<style>
+  :root{
+    --excel-green:#217346;
+    --grid-line:#d0d0d0;
+    --header-fill:#f3f2f1;
+    --header-fill-active:#e2f0d9;
+    --input-blue:#1155CC;
+    --up-profit:#1e7e34;
+    --down-loss:#d32f2f;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    font-family:Calibri,"맑은 고딕","Segoe UI",Arial,sans-serif;
+    font-size:12px;color:#222;
+    background:#f3f2f1;
+    user-select:none;
+  }
+  input,button{font-family:inherit;}
+
+  /* ---- title bar ---- */
+  .titlebar{
+    background:var(--excel-green);
+    color:#fff;
+    display:flex;align-items:center;
+    padding:4px 10px;
+    font-size:13px;
+    gap:8px;
+  }
+  .titlebar .logo{
+    width:18px;height:18px;background:#fff;border-radius:3px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--excel-green);font-weight:bold;font-size:11px;
+  }
+  .titlebar .fname{flex:1;text-align:center;opacity:.95;}
+  .titlebar .winctl{display:flex;gap:14px;font-size:13px;opacity:.9;}
+
+  /* ---- ribbon tabs ---- */
+  .ribbon-tabs{
+    background:#fff;
+    display:flex;gap:2px;
+    padding:0 10px;
+    font-size:12.5px;
+    border-bottom:1px solid var(--grid-line);
+  }
+  .ribbon-tabs span{
+    padding:7px 10px 6px;
+    cursor:default;color:#444;
+  }
+  .ribbon-tabs span.active{
+    color:var(--excel-green);font-weight:600;
+    border-bottom:2px solid var(--excel-green);
+  }
+
+  /* ---- ribbon ---- */
+  .ribbon{
+    background:#fafafa;
+    border-bottom:1px solid var(--grid-line);
+    display:flex;align-items:stretch;
+    padding:4px 10px 2px;
+  }
+  .rgroup{
+    display:flex;flex-direction:column;align-items:center;
+    padding:0 10px;border-right:1px solid var(--grid-line);
+  }
+  .rgroup:last-child{border-right:none;}
+  .rbtns{display:flex;gap:6px;align-items:center;padding-bottom:4px;}
+  .rbtns .ricon{
+    min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+    border:1px solid transparent;border-radius:3px;font-size:12px;color:#333;padding:0 4px;
+  }
+  .rbtns select{font-size:11px;height:22px;}
+  .rgroup .glabel{font-size:10px;color:#666;margin-top:2px;}
+  .rbtns .ricon.b{font-weight:bold;}
+  .rbtns .ricon.i{font-style:italic;}
+  .rbtns .ricon.u{text-decoration:underline;}
+  .swatch{width:14px;height:4px;background:var(--up-profit);display:inline-block;margin-left:2px;}
+
+  /* ---- formula bar ---- */
+  .formulabar{
+    display:flex;align-items:center;gap:6px;
+    background:#fff;border-bottom:1px solid var(--grid-line);
+    padding:3px 10px;
+  }
+  #cellRef{
+    width:64px;height:20px;border:1px solid var(--grid-line);
+    text-align:center;font-size:12px;
+  }
+  .fx{color:#217346;font-style:italic;font-weight:bold;font-size:12px;padding:0 4px;}
+  #formulaBar{
+    flex:1;height:20px;border:1px solid var(--grid-line);
+    padding:0 4px;font-size:12px;
+  }
+
+  /* ---- sheet ---- */
+  .sheet-wrap{
+    position:relative;
+    overflow:auto;
+    height:calc(100vh - 168px);
+    background:#fff;
+  }
+  table.sheet{
+    border-collapse:collapse;
+    table-layout:fixed;
+  }
+  table.sheet th, table.sheet td{
+    border:1px solid var(--grid-line);
+    height:20px;
+    padding:0 4px;
+    white-space:nowrap;
+    overflow:hidden;
+  }
+  table.sheet thead th{
+    background:var(--header-fill);
+    color:#444;font-weight:normal;
+    position:sticky;top:0;z-index:2;
+    text-align:center;
+  }
+  table.sheet thead th.corner{
+    position:sticky;left:0;top:0;z-index:3;width:40px;background:var(--header-fill);
+  }
+  table.sheet th.rownum{
+    background:var(--header-fill);color:#444;
+    text-align:center;width:40px;
+    position:sticky;left:0;z-index:1;
+  }
+  col.rowh{width:40px;}
+  col.colA{width:160px;}
+  col.colB{width:150px;}
+  col.wide{width:95px;}
+
+  td.cell{background:#fff;}
+  td.cell.selected{outline:2px solid var(--excel-green);outline-offset:-1px;}
+
+  .cell-title{
+    font-size:16px;font-weight:bold;color:#1e4620;
+    background:var(--header-fill-active);
+  }
+  .cell-label{color:#333;}
+  .cell-label.strong{font-weight:bold;background:#eef3fb;}
+  .cell-input input{
+    width:100%;height:18px;border:none;outline:none;background:transparent;
+    color:var(--input-blue);font-weight:bold;text-align:right;font-size:12px;
+    font-family:inherit;
+  }
+  .cell-calc{
+    text-align:right;font-weight:bold;color:#000;background:#fffbea;
+  }
+  .cell-calc.up{color:var(--up-profit);}
+  .cell-calc.down{color:var(--down-loss);}
+  .cell-calc.neutral{color:#777;font-weight:normal;}
+
+  /* ---- floating chart object (엑셀 삽입 차트처럼 시트 위에 떠 있음) ---- */
+  .xl-chart{
+    position:absolute;
+    top:60px;left:635px;width:460px;
+    background:#fff;border:1px solid #b3b3b3;
+    box-shadow:2px 2px 8px rgba(0,0,0,.15);
+    padding:8px;z-index:5;
+  }
+  .xl-chart-title{font-size:12px;font-weight:bold;color:#333;margin-bottom:4px;}
+  .xl-chart-note{font-size:10px;color:#888;margin-top:4px;line-height:1.4;}
+  #priceChart{display:block;width:100%;height:auto;}
+
+  /* ---- sheet tabs / status bar ---- */
+  .sheettabs{
+    display:flex;align-items:center;gap:2px;
+    background:#f3f2f1;border-top:1px solid var(--grid-line);
+    padding:3px 10px;font-size:12px;
+  }
+  .sheettabs .tab{
+    padding:4px 12px;border:1px solid var(--grid-line);border-bottom:none;
+    background:#e6e6e6;color:#666;
+  }
+  .sheettabs .tab.active{background:#fff;color:#000;font-weight:bold;border-top:2px solid var(--excel-green);}
+  .sheettabs .plus{padding:2px 8px;color:#666;}
+  .statusbar{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--excel-green);color:#fff;font-size:11px;
+    padding:3px 12px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="titlebar">
+    <div class="logo">X</div>
+    <div class="fname">삼성화재_주식현황판.xlsx - Excel</div>
+    <div class="winctl"><span>—</span><span>▢</span><span>✕</span></div>
+  </div>
+
+  <div class="ribbon-tabs">
+    <span>파일</span><span class="active">홈</span><span>삽입</span><span>페이지 레이아웃</span>
+    <span>수식</span><span>데이터</span><span>검토</span><span>보기</span>
+  </div>
+
+  <div class="ribbon">
+    <div class="rgroup">
+      <div class="rbtns">
+        <div class="ricon">📋</div><div class="ricon">✂</div>
+      </div>
+      <div class="glabel">클립보드</div>
+    </div>
+    <div class="rgroup">
+      <div class="rbtns">
+        <select><option>맑은 고딕</option></select>
+        <select style="width:36px;"><option>11</option></select>
+        <div class="ricon b">B</div><div class="ricon i">I</div><div class="ricon u">U</div>
+        <div class="ricon">🎨<span class="swatch"></span></div>
+      </div>
+      <div class="glabel">글꼴</div>
+    </div>
+    <div class="rgroup">
+      <div class="rbtns">
+        <div class="ricon">≡</div><div class="ricon">☰</div><div class="ricon">⊞</div>
+      </div>
+      <div class="glabel">맞춤</div>
+    </div>
+    <div class="rgroup">
+      <div class="rbtns">
+        <select><option>일반</option><option>숫자</option><option>백분율</option></select>
+        <div class="ricon">₩</div><div class="ricon">%</div>
+      </div>
+      <div class="glabel">표시 형식</div>
+    </div>
+  </div>
+
+  <div class="formulabar">
+    <input id="cellRef" value="A1" readonly>
+    <span class="fx">fx</span>
+    <input id="formulaBar" value="">
+  </div>
+
+  <div class="sheet-wrap">
+    <table class="sheet" id="sheetTable">
+      <colgroup>
+        <col class="rowh"><col class="colA"><col class="colB">
+        <col class="wide"><col class="wide"><col class="wide"><col class="wide"><col class="wide"><col class="wide">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="corner"></th>
+          <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th>
+        </tr>
+      </thead>
+      <tbody id="sheetBody">
+        <tr><th class="rownum">1</th>
+          <td class="cell" data-addr="A1"></td><td class="cell" data-addr="B1"></td>
+          <td class="cell" data-addr="C1"></td><td class="cell" data-addr="D1"></td>
+          <td class="cell" data-addr="E1"></td><td class="cell" data-addr="F1"></td>
+          <td class="cell" data-addr="G1"></td><td class="cell" data-addr="H1"></td>
+        </tr>
+        <tr><th class="rownum">2</th>
+          <td class="cell" data-addr="A2"></td>
+          <td class="cell cell-title" data-addr="B2" colspan="5">삼성화재해상보험(000810) 주식 현황판</td>
+          <td class="cell" data-addr="G2"></td><td class="cell" data-addr="H2"></td>
+        </tr>
+        <tr><th class="rownum">3</th>
+          <td class="cell" data-addr="A3"></td><td class="cell" data-addr="B3"></td>
+          <td class="cell" data-addr="C3"></td>
+          <td class="cell cell-label strong" data-addr="D3">분기</td>
+          <td class="cell cell-label strong" data-addr="E3">종가 (원)</td>
+          <td class="cell" data-addr="F3"></td>
+          <td class="cell" data-addr="G3"></td><td class="cell" data-addr="H3"></td>
+        </tr>
+        <tr><th class="rownum">4</th>
+          <td class="cell cell-label" data-addr="A4">종목명</td>
+          <td class="cell cell-label" data-addr="B4">삼성화재해상보험</td>
+          <td class="cell" data-addr="C4"></td>
+          <td class="cell cell-label" data-addr="D4">2020 Q1</td>
+          <td class="cell cell-input" data-addr="E4"><input id="in-q0" type="text" inputmode="numeric" value="154000"></td>
+          <td class="cell" data-addr="F4"></td>
+          <td class="cell" data-addr="G4"></td><td class="cell" data-addr="H4"></td>
+        </tr>
+        <tr><th class="rownum">5</th>
+          <td class="cell cell-label" data-addr="A5">종목코드</td>
+          <td class="cell cell-label" data-addr="B5">000810</td>
+          <td class="cell" data-addr="C5"></td>
+          <td class="cell cell-label" data-addr="D5">2020 Q2</td>
+          <td class="cell cell-input" data-addr="E5"><input id="in-q1" type="text" inputmode="numeric" value="176000"></td>
+          <td class="cell" data-addr="F5"></td>
+          <td class="cell" data-addr="G5"></td><td class="cell" data-addr="H5"></td>
+        </tr>
+        <tr><th class="rownum">6</th>
+          <td class="cell" data-addr="A6"></td><td class="cell" data-addr="B6"></td>
+          <td class="cell" data-addr="C6"></td>
+          <td class="cell cell-label" data-addr="D6">2020 Q3</td>
+          <td class="cell cell-input" data-addr="E6"><input id="in-q2" type="text" inputmode="numeric" value="182000"></td>
+          <td class="cell" data-addr="F6"></td>
+          <td class="cell" data-addr="G6"></td><td class="cell" data-addr="H6"></td>
+        </tr>
+        <tr><th class="rownum">7</th>
+          <td class="cell cell-label strong" data-addr="A7">매수가 (원)</td>
+          <td class="cell cell-input" data-addr="B7" data-formula="입력값">
+            <input id="in-buyPrice" type="text" inputmode="numeric" value="380000">
+          </td>
+          <td class="cell" data-addr="C7"></td>
+          <td class="cell cell-label" data-addr="D7">2020 Q4</td>
+          <td class="cell cell-input" data-addr="E7"><input id="in-q3" type="text" inputmode="numeric" value="187500"></td>
+          <td class="cell" data-addr="F7"></td>
+          <td class="cell" data-addr="G7"></td><td class="cell" data-addr="H7"></td>
+        </tr>
+        <tr><th class="rownum">8</th>
+          <td class="cell cell-label strong" data-addr="A8">수량 (주)</td>
+          <td class="cell cell-input" data-addr="B8" data-formula="입력값">
+            <input id="in-qty" type="text" inputmode="numeric" value="10">
+          </td>
+          <td class="cell" data-addr="C8"></td>
+          <td class="cell cell-label" data-addr="D8">2021 Q1</td>
+          <td class="cell cell-input" data-addr="E8"><input id="in-q4" type="text" inputmode="numeric" value="190000"></td>
+          <td class="cell" data-addr="F8"></td>
+          <td class="cell" data-addr="G8"></td><td class="cell" data-addr="H8"></td>
+        </tr>
+        <tr><th class="rownum">9</th>
+          <td class="cell cell-label strong" data-addr="A9">현재가 (원)</td>
+          <td class="cell cell-input" data-addr="B9" data-formula="입력값">
+            <input id="in-curPrice" type="text" inputmode="numeric" value="630000">
+          </td>
+          <td class="cell" data-addr="C9"></td>
+          <td class="cell cell-label" data-addr="D9">2021 Q2</td>
+          <td class="cell cell-input" data-addr="E9"><input id="in-q5" type="text" inputmode="numeric" value="220500"></td>
+          <td class="cell" data-addr="F9"></td>
+          <td class="cell" data-addr="G9"></td><td class="cell" data-addr="H9"></td>
+        </tr>
+        <tr><th class="rownum">10</th>
+          <td class="cell" data-addr="A10"></td><td class="cell" data-addr="B10"></td>
+          <td class="cell" data-addr="C10"></td>
+          <td class="cell cell-label" data-addr="D10">2021 Q3</td>
+          <td class="cell cell-input" data-addr="E10"><input id="in-q6" type="text" inputmode="numeric" value="235000"></td>
+          <td class="cell" data-addr="F10"></td>
+          <td class="cell" data-addr="G10"></td><td class="cell" data-addr="H10"></td>
+        </tr>
+        <tr><th class="rownum">11</th>
+          <td class="cell cell-label" data-addr="A11">매입금액 (원)</td>
+          <td class="cell cell-calc" id="out-buyTotal" data-addr="B11" data-formula="=B7*B8">-</td>
+          <td class="cell" data-addr="C11"></td>
+          <td class="cell cell-label" data-addr="D11">2021 Q4</td>
+          <td class="cell cell-input" data-addr="E11"><input id="in-q7" type="text" inputmode="numeric" value="202000"></td>
+          <td class="cell" data-addr="F11"></td>
+          <td class="cell" data-addr="G11"></td><td class="cell" data-addr="H11"></td>
+        </tr>
+        <tr><th class="rownum">12</th>
+          <td class="cell cell-label" data-addr="A12">평가금액 (원)</td>
+          <td class="cell cell-calc" id="out-evalTotal" data-addr="B12" data-formula="=B9*B8">-</td>
+          <td class="cell" data-addr="C12"></td>
+          <td class="cell cell-label" data-addr="D12">2022 Q1</td>
+          <td class="cell cell-input" data-addr="E12"><input id="in-q8" type="text" inputmode="numeric" value="219000"></td>
+          <td class="cell" data-addr="F12"></td>
+          <td class="cell" data-addr="G12"></td><td class="cell" data-addr="H12"></td>
+        </tr>
+        <tr><th class="rownum">13</th>
+          <td class="cell cell-label" data-addr="A13">평가손익 (원)</td>
+          <td class="cell cell-calc" id="out-profitAmt" data-addr="B13" data-formula="=B12-B11">-</td>
+          <td class="cell" data-addr="C13"></td>
+          <td class="cell cell-label" data-addr="D13">2022 Q2</td>
+          <td class="cell cell-input" data-addr="E13"><input id="in-q9" type="text" inputmode="numeric" value="201000"></td>
+          <td class="cell" data-addr="F13"></td>
+          <td class="cell" data-addr="G13"></td><td class="cell" data-addr="H13"></td>
+        </tr>
+        <tr><th class="rownum">14</th>
+          <td class="cell cell-label" data-addr="A14">수익률 (%)</td>
+          <td class="cell cell-calc" id="out-profitRate" data-addr="B14" data-formula="=(B13/B11)*100">-</td>
+          <td class="cell" data-addr="C14"></td>
+          <td class="cell cell-label" data-addr="D14">2022 Q3</td>
+          <td class="cell cell-input" data-addr="E14"><input id="in-q10" type="text" inputmode="numeric" value="184000"></td>
+          <td class="cell" data-addr="F14"></td>
+          <td class="cell" data-addr="G14"></td><td class="cell" data-addr="H14"></td>
+        </tr>
+        <tr><th class="rownum">15</th>
+          <td class="cell cell-label strong" data-addr="A15">목표수익률 (%)</td>
+          <td class="cell cell-input" data-addr="B15" data-formula="입력값">
+            <input id="in-targetRate" type="text" inputmode="numeric" value="15">
+          </td>
+          <td class="cell" data-addr="C15"></td>
+          <td class="cell cell-label" data-addr="D15">2022 Q4</td>
+          <td class="cell cell-input" data-addr="E15"><input id="in-q11" type="text" inputmode="numeric" value="200000"></td>
+          <td class="cell" data-addr="F15"></td>
+          <td class="cell" data-addr="G15"></td><td class="cell" data-addr="H15"></td>
+        </tr>
+        <tr><th class="rownum">16</th>
+          <td class="cell cell-label" data-addr="A16">목표 달성률 (%)</td>
+          <td class="cell cell-calc" id="out-achieveRate" data-addr="B16" data-formula="=(B14/B15)*100">-</td>
+          <td class="cell" data-addr="C16"></td>
+          <td class="cell cell-label" data-addr="D16">2023 Q1</td>
+          <td class="cell cell-input" data-addr="E16"><input id="in-q12" type="text" inputmode="numeric" value="206000"></td>
+          <td class="cell" data-addr="F16"></td>
+          <td class="cell" data-addr="G16"></td><td class="cell" data-addr="H16"></td>
+        </tr>
+        <tr><th class="rownum">17</th>
+          <td class="cell cell-label" data-addr="A17">달성 여부</td>
+          <td class="cell cell-calc" id="out-achieveFlag" data-addr="B17" data-formula="=IF(B14&gt;=B15,&quot;달성&quot;,&quot;미달성&quot;)">-</td>
+          <td class="cell" data-addr="C17"></td>
+          <td class="cell cell-label" data-addr="D17">2023 Q2</td>
+          <td class="cell cell-input" data-addr="E17"><input id="in-q13" type="text" inputmode="numeric" value="230000"></td>
+          <td class="cell" data-addr="F17"></td>
+          <td class="cell" data-addr="G17"></td><td class="cell" data-addr="H17"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="xl-chart" id="xlChart">
+      <div class="xl-chart-title">📈 삼성화재(000810) 주가추이 — 분기별 (2020~2026)</div>
+      <canvas id="priceChart" width="440" height="230"></canvas>
+      <div class="xl-chart-note">※ Yahoo Finance 분기 시세 기준(2026-08-25 조회). 2026 Q3은 분기 진행중(8/10 종가 63만원)입니다. E열 값을 수정하면 차트가 바로 반영됩니다.</div>
+    </div>
+  </div>
+
+  <div class="sheettabs">
+    <div class="tab active">Sheet1</div>
+    <div class="tab">Sheet2</div>
+    <div class="plus">＋</div>
+  </div>
+  <div class="statusbar">
+    <span>준비</span>
+    <span>100%</span>
+  </div>
+
+<script>
+(function(){
+  const COLS = ["A","B","C","D","E","F","G","H"];
+  const body = document.getElementById("sheetBody");
+
+  // 2020 Q1 ~ 2026 Q3(현재, 진행중) 분기별 종가. Yahoo Finance 분기 캔들 기준(2026-08-25 조회, KRW).
+  // rows 4~17 은 위 표에 index 0~13 이 이미 입력되어 있고, rows 18~30 은 아래에서 index 14~26 을 채운다.
+  const QUARTERS = [
+    {label:"2020 Q1", price:154000}, {label:"2020 Q2", price:176000},
+    {label:"2020 Q3", price:182000}, {label:"2020 Q4", price:187500},
+    {label:"2021 Q1", price:190000}, {label:"2021 Q2", price:220500},
+    {label:"2021 Q3", price:235000}, {label:"2021 Q4", price:202000},
+    {label:"2022 Q1", price:219000}, {label:"2022 Q2", price:201000},
+    {label:"2022 Q3", price:184000}, {label:"2022 Q4", price:200000},
+    {label:"2023 Q1", price:206000}, {label:"2023 Q2", price:230000},
+    {label:"2023 Q3", price:260500}, {label:"2023 Q4", price:263000},
+    {label:"2024 Q1", price:306000}, {label:"2024 Q2", price:389000},
+    {label:"2024 Q3", price:344500}, {label:"2024 Q4", price:358500},
+    {label:"2025 Q1", price:357500}, {label:"2025 Q2", price:434000},
+    {label:"2025 Q3", price:451500}, {label:"2025 Q4", price:497000},
+    {label:"2026 Q1", price:440500}, {label:"2026 Q2", price:618000},
+    {label:"2026 Q3", price:630000}
+  ];
+
+  // rows 4~17 은 위에 정적으로 이미 작성됨(index 0~13). 나머지 index 14~26 을 rows 18~30 에 채운다.
+  for (let r = 18; r <= 30; r++) {
+    const i = r - 4;
+    const q = QUARTERS[i];
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<th class="rownum">${r}</th>` +
+      `<td class="cell" data-addr="A${r}"></td>` +
+      `<td class="cell" data-addr="B${r}"></td>` +
+      `<td class="cell" data-addr="C${r}"></td>` +
+      `<td class="cell cell-label" data-addr="D${r}">${q.label}</td>` +
+      `<td class="cell cell-input" data-addr="E${r}"><input id="in-q${i}" type="text" inputmode="numeric" value="${q.price}"></td>` +
+      `<td class="cell" data-addr="F${r}"></td>` +
+      `<td class="cell" data-addr="G${r}"></td>` +
+      `<td class="cell" data-addr="H${r}"></td>`;
+    body.appendChild(tr);
+  }
+
+  const quarterInputs = QUARTERS.map((_, i) => document.getElementById("in-q" + i));
+
+  // ---- 입력값 로드 ----
+  const STORAGE_KEY = "samsungFireStockDashboard";
+  const buyPriceEl = document.getElementById("in-buyPrice");
+  const qtyEl = document.getElementById("in-qty");
+  const curPriceEl = document.getElementById("in-curPrice");
+  const targetRateEl = document.getElementById("in-targetRate");
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (saved) {
+      buyPriceEl.value = saved.buyPrice ?? buyPriceEl.value;
+      qtyEl.value = saved.qty ?? qtyEl.value;
+      curPriceEl.value = saved.curPrice ?? curPriceEl.value;
+      targetRateEl.value = saved.targetRate ?? targetRateEl.value;
+      if (Array.isArray(saved.quarterPrices) && saved.quarterPrices.length === quarterInputs.length) {
+        saved.quarterPrices.forEach((v, i) => { quarterInputs[i].value = v; });
+      }
+    }
+  } catch (e) {}
+
+  function toNumber(v){
+    const n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
+    return isNaN(n) ? 0 : n;
+  }
+  function won(n){
+    return Math.round(n).toLocaleString("ko-KR") + "원";
+  }
+  function pct(n){
+    return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+  }
+
+  function saveAll(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        buyPrice: buyPriceEl.value, qty: qtyEl.value, curPrice: curPriceEl.value,
+        targetRate: targetRateEl.value,
+        quarterPrices: quarterInputs.map(inp => inp.value)
+      }));
+    } catch (e) {}
+  }
+
+  const outBuyTotal = document.getElementById("out-buyTotal");
+  const outEvalTotal = document.getElementById("out-evalTotal");
+  const outProfitAmt = document.getElementById("out-profitAmt");
+  const outProfitRate = document.getElementById("out-profitRate");
+  const outAchieveRate = document.getElementById("out-achieveRate");
+  const outAchieveFlag = document.getElementById("out-achieveFlag");
+
+  function recalc(){
+    const buyPrice = toNumber(buyPriceEl.value);
+    const qty = toNumber(qtyEl.value);
+    const curPrice = toNumber(curPriceEl.value);
+    const targetRate = toNumber(targetRateEl.value);
+
+    const buyTotal = buyPrice * qty;
+    const evalTotal = curPrice * qty;
+    const profitAmt = evalTotal - buyTotal;
+    const profitRate = buyTotal !== 0 ? (profitAmt / buyTotal) * 100 : 0;
+    const achieveRate = targetRate !== 0 ? (profitRate / targetRate) * 100 : 0;
+    const achieved = targetRate !== 0 && profitRate >= targetRate;
+
+    outBuyTotal.textContent = won(buyTotal);
+    outEvalTotal.textContent = won(evalTotal);
+    outProfitAmt.textContent = won(profitAmt);
+    outProfitRate.textContent = pct(profitRate);
+    outAchieveRate.textContent = achieveRate.toFixed(1) + "%";
+    outAchieveFlag.textContent = achieved ? "달성 ✔" : "미달성";
+
+    [outProfitAmt, outProfitRate].forEach(el => {
+      el.classList.remove("up", "down");
+      el.classList.add(profitAmt >= 0 ? "up" : "down");
+    });
+
+    outAchieveRate.classList.toggle("up", achieved);
+    outAchieveFlag.classList.toggle("up", achieved);
+    outAchieveFlag.classList.toggle("neutral", !achieved);
+
+    saveAll();
+  }
+
+  [buyPriceEl, qtyEl, curPriceEl, targetRateEl].forEach(el => el.addEventListener("input", recalc));
+
+  // ---- 분기별 주가추이 차트 ----
+  const chartCanvas = document.getElementById("priceChart");
+  const chartCtx = chartCanvas.getContext("2d");
+
+  function drawChart(){
+    const w = chartCanvas.width, h = chartCanvas.height;
+    chartCtx.clearRect(0, 0, w, h);
+
+    const prices = quarterInputs.map(inp => toNumber(inp.value));
+    const padL = 46, padR = 10, padT = 10, padB = 22;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const range = (maxP - minP) || 1;
+    const yFor = p => padT + plotH - ((p - minP) / range) * plotH;
+    const xFor = i => padL + (i / (prices.length - 1)) * plotW;
+
+    chartCtx.font = "9px Calibri, sans-serif";
+    chartCtx.strokeStyle = "#e8e8e8";
+    chartCtx.fillStyle = "#888";
+    const steps = 4;
+    for (let s = 0; s <= steps; s++) {
+      const val = minP + (range * s / steps);
+      const y = yFor(val);
+      chartCtx.beginPath();
+      chartCtx.moveTo(padL, y);
+      chartCtx.lineTo(w - padR, y);
+      chartCtx.stroke();
+      chartCtx.fillText(Math.round(val).toLocaleString("ko-KR"), 2, y + 3);
+    }
+
+    chartCtx.fillStyle = "#666";
+    QUARTERS.forEach((q, i) => {
+      if (q.label.endsWith("Q1") || i === QUARTERS.length - 1) {
+        chartCtx.fillText(q.label.slice(0, 4), xFor(i) - 10, h - 6);
+      }
+    });
+
+    chartCtx.beginPath();
+    prices.forEach((p, i) => {
+      const x = xFor(i), y = yFor(p);
+      if (i === 0) chartCtx.moveTo(x, y); else chartCtx.lineTo(x, y);
+    });
+    chartCtx.strokeStyle = "#1155CC";
+    chartCtx.lineWidth = 2;
+    chartCtx.stroke();
+
+    prices.forEach((p, i) => {
+      const x = xFor(i), y = yFor(p);
+      chartCtx.beginPath();
+      chartCtx.arc(x, y, i === prices.length - 1 ? 3 : 2, 0, Math.PI * 2);
+      chartCtx.fillStyle = i === prices.length - 1 ? "#d32f2f" : "#1155CC";
+      chartCtx.fill();
+    });
+
+    const lastX = xFor(prices.length - 1), lastY = yFor(prices[prices.length - 1]);
+    chartCtx.fillStyle = "#d32f2f";
+    chartCtx.font = "bold 10px Calibri, sans-serif";
+    chartCtx.fillText(Math.round(prices[prices.length - 1]).toLocaleString("ko-KR") + "원", Math.min(lastX - 40, w - 70), lastY - 8);
+  }
+
+  quarterInputs.forEach(inp => {
+    inp.addEventListener("input", () => { saveAll(); drawChart(); });
+  });
+
+  recalc();
+  drawChart();
+
+  // ---- 셀 선택 / 수식 입력줄 연동 ----
+  const cellRef = document.getElementById("cellRef");
+  const formulaBar = document.getElementById("formulaBar");
+  let selectedCell = null;
+  let boundInput = null;
+
+  function selectCell(td){
+    if (selectedCell) selectedCell.classList.remove("selected");
+    selectedCell = td;
+    td.classList.add("selected");
+    cellRef.value = td.dataset.addr || "";
+
+    const innerInput = td.querySelector("input");
+    if (innerInput) {
+      boundInput = innerInput;
+      formulaBar.value = innerInput.value;
+      formulaBar.readOnly = false;
+    } else if (td.id && td.id.startsWith("out-")) {
+      boundInput = null;
+      formulaBar.value = td.dataset.formula || "";
+      formulaBar.readOnly = true;
+    } else {
+      boundInput = null;
+      formulaBar.value = td.textContent.trim();
+      formulaBar.readOnly = false;
+    }
+  }
+
+  document.querySelectorAll("td.cell").forEach(td => {
+    td.addEventListener("mousedown", () => selectCell(td));
+  });
+  document.querySelectorAll(".cell-input input").forEach(inp => {
+    inp.addEventListener("focus", () => selectCell(inp.closest("td.cell")));
+    inp.addEventListener("input", () => { if (boundInput === inp) formulaBar.value = inp.value; });
+  });
+  formulaBar.addEventListener("input", () => {
+    if (boundInput) {
+      boundInput.value = formulaBar.value;
+      boundInput.dispatchEvent(new Event("input"));
+    }
+  });
+
+  // 기본 선택 셀
+  selectCell(document.querySelector('[data-addr="B7"]'));
+
+  // Enter 입력 시 엑셀처럼 아래 셀(다음 입력칸)로 이동
+  const inputOrder = [buyPriceEl, qtyEl, curPriceEl, targetRateEl];
+  inputOrder.forEach((el, idx) => {
+    el.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const next = inputOrder[idx + 1];
+        if (next) { next.focus(); next.select(); }
+        else { el.blur(); }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
