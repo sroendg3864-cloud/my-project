@@ -31,20 +31,30 @@ EOF
 - 뷰어가 뭔가를 바꾸면(검토완료, 메모, 알림 전송 클릭 등) `claude.use("artifact")` 캡슐화된 함수로 **페이지 전체를 다시 발행(publish)**해서 모든 뷰어에게 상태를 동기화합니다. (`artifact-capabilities` 문서 참고)
 - "10분마다 새 속보"는 브라우저 탭이 열려 있을 때만 동작하는 클라이언트 타이머입니다. **진짜 백엔드가 없어서** 아무도 안 보고 있으면 갱신되지 않습니다.
 
-## 다음 단계로 하려던 것: 이메일 자동 알림
+## 이메일 자동 알림 (구현 완료 — GitHub Actions + Resend)
 사용자가 원하는 것: 삼성화재 연관 사고가 새로 잡히면 **사람이 버튼을 누르지 않아도** `sroendg3864@gmail.com`으로 자동 이메일 발송.
 
-논의된 방향:
-1. **발송 수단**: Resend/SendGrid 같은 이메일 발송 전용 API 서비스에 가입해서 API 키를 받는 방식으로 결정함 (Gmail 커넥터는 초안 생성까지만 지원하고 실제 발송은 사람이 눌러야 할 수 있어서 배제).
-2. **감시 주기**: 아직 미확정. Cowork의 스케줄 작업(scheduled task)은 보통 최소 간격이 1시간이라 "10분 간격" 요구사항과 안 맞을 수 있음 — Claude Code 쪽에서 사용자 본인 서버/크론(예: GitHub Actions 스케줄, 자체 서버 cron, Vercel Cron 등)으로 처리하면 진짜 10분 간격도 가능함. 이 부분을 사용자와 다시 상의해서 정해야 함.
+결정된 방향:
+1. **발송 수단**: [Resend](https://resend.com) API (Gmail 커넥터는 초안 생성까지만 지원해서 배제, SendGrid 대비 무료 티어/API 단순성 때문에 Resend 선택).
+2. **감시 주기**: Cowork 스케줄 작업은 최소 간격이 보통 1시간이라 "10분 간격" 요구사항과 안 맞아서, **GitHub Actions 스케줄러**(`cron: "*/10 * * * *"`)로 처리 — Claude Code(이 리포)에서 진짜 10분 간격 실행이 가능.
 
-### 구현 아이디어 (참고용, 아직 미구현)
-1. 정적 페이지 대신 작은 백엔드(Node/Python)를 두거나, GitHub Actions 같은 스케줄러가 주기적으로:
-   - (지금은 더미 데이터라) 새 속보를 시뮬레이션하거나, 나중에는 실제 뉴스 API를 조회
-   - 삼성화재 계약 매칭 로직 실행 (지금은 더미 계약 DB, 나중에는 사내 계약관리 API)
-   - 새로 매칭된 미검토 건이 있으면 Resend/SendGrid API로 `sroendg3864@gmail.com`에 이메일 발송
-   - 상태를 어딘가에 저장 (지금 프로토타입처럼 Artifact publish를 계속 쓸지, 아니면 진짜 DB로 옮길지 결정 필요)
-2. 이메일 서비스 가입 후 발급받는 API 키는 **절대 코드에 하드코딩하지 말고** 환경변수/시크릿으로 관리해야 합니다.
+### 구현 내용
+- `scripts/monitor.js` — GitHub Actions에서 10분마다 실행되는 Node 스크립트.
+  - `state.json`을 읽어서 새 속보 1건을 시뮬레이션(현재는 더미 — 나중에 실제 뉴스 API로 교체 가능한 지점: `generateNewIncident()`)하고, 삼성화재 계약 매칭 로직을 실행한 뒤(`maybeBuildContract()`), 매칭되면 **즉시** Resend API로 `sroendg3864@gmail.com`에 알림 이메일을 보낸다.
+  - `RESEND_API_KEY` 환경변수(= GitHub Secret)가 없으면 발송을 건너뛰고 경고만 남긴다 (초기 설정 전에도 워크플로우가 깨지지 않도록).
+  - 발송에 성공하면 해당 사고의 `workflow.alertSent`/`workflow.alertLog`에 자동 발송 기록을 남긴다.
+  - 결과를 `state.json`에 다시 저장한다.
+- `.github/workflows/incident-monitor.yml` — 10분 간격 cron + `workflow_dispatch`(수동 실행)로 위 스크립트를 실행하고, `state.json` 변경분을 같은 브랜치에 자동 커밋한다.
+- `state.json` — 백엔드 전용 상태 저장소. `initial_state.json`(더미데이터 12건)으로 시드됨. **주의**: 예약 실행(`schedule:`)은 GitHub 기본 브랜치에 워크플로우 파일이 있어야 동작하므로, 이 브랜치를 머지한 뒤부터 실제로 10분마다 돌아간다.
+
+### 설정 방법 (사용자가 해야 할 일)
+1. [resend.com](https://resend.com)에서 가입하고 API 키 발급.
+2. 리포 Settings → Secrets and variables → Actions에 `RESEND_API_KEY` 이름으로 등록.
+3. (선택) 발신 도메인을 인증했다면 `RESEND_FROM` 시크릿/변수로 발신 주소 지정 가능 (기본값: `onboarding@resend.dev`, Resend 테스트용 발신 주소).
+
+### 알려진 한계 / 다음 단계
+- `scripts/monitor.js`가 관리하는 `state.json`은 아직 **Cowork Artifact(`app.html`)의 라이브 상태와 별개**다. GitHub Actions에서는 Artifact의 `publish()` API를 호출할 브라우저 컨텍스트가 없어서, 지금은 이메일 알림 자동화만 우선 구현했고 대시보드 동기화는 별도 작업이 필요하다 (예: 대시보드가 `state.json`을 원격에서 fetch하도록 아키텍처를 바꾸거나, 별도 동기화 스텝 추가).
+- 사고/뉴스는 여전히 더미 시뮬레이션이다. 실제 뉴스 API·사내 계약관리 API 연동은 `scripts/monitor.js`의 `generateNewIncident()` / `maybeBuildContract()`를 교체하면 된다.
 
 ## 사용자 요청 원문 메모
 - 손해보험협회에서 사고 관련 연락이 올 때마다 계약 담당자에게 일일이 물어보는 게 번거로워서 만든 도구.
