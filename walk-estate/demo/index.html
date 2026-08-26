@@ -1,0 +1,1381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WalkEstate 임장로드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* ============================================================
+   페이지 바닥 — 앱을 받치는 레이어 (뷰어 테마에 반응)
+   ============================================================ */
+:root {
+  --page-bg: #f3f0f1;
+  --page-panel: #ffffff;
+  --page-fg: #221c1e;
+  --page-muted: #6b6065;
+  --page-rule: #ded7d9;
+  --page-accent: #ff385c;
+  --page-shadow: 0 24px 60px rgba(34, 20, 25, 0.16), 0 2px 8px rgba(34, 20, 25, 0.06);
+
+  /* ---- WalkEstate 디자인 토큰 (블루프린트 v1.0.0 그대로) ---- */
+  --primary: #ff385c;
+  --primary-active: #e00b41;
+  --primary-disabled: #ffd1da;
+  --primary-soft: #fff0f2;
+  --ink: #222222;
+  --body: #3f3f3f;
+  --muted: #6a6a6a;
+  --muted-soft: #929292;
+  --hairline: #dddddd;
+  --hairline-soft: #ebebeb;
+  --canvas: #ffffff;
+  --surface-soft: #f7f7f7;
+  --surface-strong: #f2f2f2;
+  --on-primary: #ffffff;
+  --safety: #2a85ff;
+  --education: #7f56d9;
+  --living: #00a699;
+  --safety-soft: #eaf2ff;
+  --education-soft: #f3eeff;
+  --living-soft: #e6f7f5;
+
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --card-float: rgba(0,0,0,0.02) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px 0, rgba(0,0,0,0.1) 0 4px 8px 0;
+
+  --kr: "Noto Sans KR", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --num: "Manrope", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page-bg: #171314;
+    --page-panel: #201b1d;
+    --page-fg: #ece7e8;
+    --page-muted: #a2969a;
+    --page-rule: #322b2d;
+    --page-shadow: 0 28px 70px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  --page-bg: #171314;
+  --page-panel: #201b1d;
+  --page-fg: #ece7e8;
+  --page-muted: #a2969a;
+  --page-rule: #322b2d;
+  --page-shadow: 0 28px 70px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font-family: var(--kr);
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ============================================================
+   레이아웃 — 스펙 레일 + 폰 프레임
+   ============================================================ */
+.wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 48px 28px 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 56px;
+  align-items: start;
+}
+.rail { display: flex; flex-direction: column; gap: 34px; min-width: 0; }
+
+.eyebrow {
+  font-family: var(--num);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--page-accent);
+}
+h1 {
+  font-family: var(--num);
+  font-size: clamp(34px, 4.4vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  margin: 10px 0 0;
+  text-wrap: balance;
+}
+h1 .kr { font-family: var(--kr); font-weight: 700; letter-spacing: -0.02em; }
+.lede {
+  margin: 16px 0 0;
+  max-width: 60ch;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--page-muted);
+}
+h2 {
+  font-family: var(--num);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--page-muted);
+  margin: 0 0 14px;
+}
+
+.steps { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.step {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--page-rule);
+  padding: 16px 4px;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+.steps li:last-child .step { border-bottom: 1px solid var(--page-rule); }
+.step:hover { background: color-mix(in srgb, var(--page-accent) 7%, transparent); }
+.step .idx {
+  font-family: var(--num);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--page-accent);
+  padding-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.step .name { display: block; font-size: 15px; font-weight: 700; }
+.step .desc { display: block; font-size: 13.5px; line-height: 1.55; color: var(--page-muted); margin-top: 4px; }
+.step[aria-current="true"] { background: color-mix(in srgb, var(--page-accent) 8%, transparent); }
+
+.formulas { display: flex; flex-direction: column; gap: 0; }
+.formula { border-top: 1px solid var(--page-rule); padding: 15px 0; }
+.formula:last-child { border-bottom: 1px solid var(--page-rule); }
+.formula dt { font-size: 13.5px; font-weight: 700; }
+.formula dd {
+  margin: 6px 0 0;
+  font-family: var(--num);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--page-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--page-muted);
+  border-left: 2px solid var(--page-accent);
+  padding-left: 14px;
+}
+.rail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ghost-btn {
+  border: 1px solid var(--page-rule);
+  background: var(--page-panel);
+  color: var(--page-fg);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.ghost-btn:hover { border-color: var(--page-accent); }
+.ghost-btn:active { transform: scale(0.98); }
+
+/* ---- 폰 프레임 ---- */
+.stage { position: sticky; top: 40px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.phone {
+  width: 390px;
+  height: 844px;
+  border-radius: 46px;
+  padding: 11px;
+  background: linear-gradient(160deg, #3a3336, #14100f);
+  box-shadow: var(--page-shadow);
+  flex: none;
+}
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 36px;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 16px;
+}
+.stage-caption { font-size: 12.5px; color: var(--page-muted); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1023px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 40px; padding: 32px 20px 56px; }
+  .stage { position: static; order: -1; }
+  .phone { width: min(390px, 100%); height: min(844px, 150vw); }
+}
+
+/* ============================================================
+   앱 내부 — 블루프린트 타이포 스케일
+   ============================================================ */
+.scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.t-rating { font-family: var(--num); font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.t-display { font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -0.4px; text-wrap: balance; }
+.t-title-md { font-size: 16px; font-weight: 600; line-height: 1.25; }
+.t-title-sm { font-size: 16px; font-weight: 500; line-height: 1.25; }
+.t-body { font-size: 16px; font-weight: 400; line-height: 1.5; }
+.t-body-sm { font-size: 14px; font-weight: 400; line-height: 1.43; }
+.t-caption { font-size: 14px; font-weight: 500; line-height: 1.29; }
+.t-badge { font-size: 11px; font-weight: 600; line-height: 1.18; }
+.num { font-family: var(--num); font-variant-numeric: tabular-nums; }
+
+.app-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 16px 20px; border-bottom: 1px solid var(--hairline-soft);
+}
+.logo-mark { width: 22px; height: 22px; flex: none; }
+.brand { font-family: var(--num); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+.brand-kr { font-size: 13px; color: var(--muted); }
+
+.hero { padding: 34px 20px 26px; border-bottom: 1px solid var(--hairline-soft); }
+.hero h2 { all: unset; display: block; }
+
+/* 알약 검색바 */
+.pill {
+  display: flex; align-items: center; gap: 0;
+  height: 64px; margin-top: 22px; padding: 4px 6px;
+  background: var(--canvas); border: 1px solid var(--hairline); border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.1);
+}
+.seg {
+  flex: 1 1 0; min-width: 0; text-align: left; background: none; border: 0;
+  padding: 8px 12px; border-right: 1px solid var(--hairline-soft); border-radius: 999px;
+  color: var(--ink);
+}
+.seg:last-of-type { border-right: 0; }
+.seg[aria-expanded="true"] { background: var(--surface-soft); }
+.seg .lbl { display: block; font-family: var(--num); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.seg .val { display: block; font-size: 13px; font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg .val.soft { color: var(--muted); font-weight: 400; }
+.seg-search {
+  flex: none; width: 48px; height: 48px; border: 0; border-radius: 999px;
+  background: var(--primary); color: var(--on-primary);
+  display: grid; place-items: center; transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.seg-search:hover { background: var(--primary-active); }
+.seg-search:active { transform: scale(0.95); }
+
+.panel {
+  margin-top: 12px; padding: 18px; background: var(--canvas);
+  border: 1px solid var(--hairline-soft); border-radius: var(--r-md); box-shadow: var(--card-float);
+  display: grid; gap: 16px;
+}
+.panel[hidden] { display: none; }
+.field { display: block; }
+.field > span {
+  display: block; margin-bottom: 6px;
+  font-family: var(--num); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink);
+}
+.input, select.input {
+  width: 100%; height: 44px; padding: 0 12px;
+  border: 1px solid var(--hairline); border-radius: var(--r-sm);
+  background: var(--surface-soft); color: var(--ink);
+  font-family: var(--num); font-size: 14px; font-variant-numeric: tabular-nums;
+}
+select.input { font-family: var(--kr); }
+.input:focus { border-color: var(--muted-soft); outline: none; }
+.toggle { display: flex; gap: 8px; }
+.toggle button {
+  flex: 1; height: 44px; border-radius: var(--r-sm);
+  border: 1px solid var(--hairline); background: var(--surface-soft); color: var(--body);
+  font-size: 14px; font-weight: 500; transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.toggle button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+input[type="range"] { width: 100%; accent-color: var(--primary); height: 44px; }
+.budget-out {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px;
+  background: var(--surface-soft); border-radius: var(--r-sm); padding: 12px 14px;
+}
+
+.group { padding: 26px 20px 0; }
+.group h3 { all: unset; display: block; font-size: 16px; font-weight: 600; }
+.group p.sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+.cards { display: grid; gap: 14px; margin-top: 14px; }
+
+.town {
+  display: block; width: 100%; text-align: left; padding: 16px;
+  background: var(--canvas); border: 1px solid var(--hairline-soft); border-radius: var(--r-md);
+  box-shadow: var(--card-float); color: var(--ink);
+  transition: transform 0.14s ease;
+}
+.town:hover { transform: translateY(-2px); }
+.town:active { transform: scale(0.99); }
+.badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; }
+.town-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.score {
+  flex: none; border-radius: 999px; padding: 4px 10px; color: var(--on-primary);
+  font-family: var(--num); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.metrics { display: flex; gap: 12px; margin-top: 12px; color: var(--muted-soft); font-size: 14px; }
+.metrics span { display: inline-flex; align-items: center; gap: 4px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tag { background: var(--surface-soft); color: var(--body); border-radius: 999px; padding: 4px 10px; }
+.foot-note { padding: 28px 20px 32px; color: var(--muted-soft); font-size: 13px; line-height: 1.6; display: flex; gap: 8px; }
+
+/* 시트 / 오버레이 */
+.overlay { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-end; }
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.42); border: 0; }
+.sheet {
+  position: relative; width: 100%; max-height: 92%;
+  background: var(--canvas); border-radius: var(--r-lg) var(--r-lg) 0 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes slide-up { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--hairline-soft); }
+.icon-btn {
+  flex: none; width: 36px; height: 36px; border: 0; border-radius: 999px;
+  background: var(--surface-strong); color: var(--ink); display: grid; place-items: center;
+}
+.icon-btn:hover { background: var(--hairline-soft); }
+.sheet-body { overflow-y: auto; }
+.sheet-foot { padding: 14px 20px 18px; border-top: 1px solid var(--hairline-soft); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--hairline-soft); }
+.stat { padding: 14px 8px; text-align: center; border-right: 1px solid var(--hairline-soft); }
+.stat:last-child { border-right: 0; }
+.stat .k { font-size: 13px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 4px; }
+.stat .v { font-family: var(--num); font-size: 16px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+.wp-list { list-style: none; margin: 0; padding: 14px 20px 20px; }
+.wp-row { display: flex; gap: 12px; padding: 9px 0; }
+.wp-dot {
+  flex: none; width: 24px; height: 24px; border-radius: 999px; margin-top: 2px;
+  display: grid; place-items: center; color: #fff;
+  font-family: var(--num); font-size: 11px; font-weight: 700;
+}
+.wp-meta { font-size: 14px; color: var(--muted-soft); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+.cta {
+  width: 100%; height: 48px; border: 0; border-radius: var(--r-sm);
+  background: var(--primary); color: var(--on-primary); font-size: 16px; font-weight: 500;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.cta:hover { background: var(--primary-active); }
+.cta:active { transform: scale(0.99); }
+.cta[disabled] { background: var(--primary-disabled); cursor: not-allowed; transform: none; }
+
+/* 실시간 임장 */
+.map-layer { position: absolute; left: 0; right: 0; top: 64px; bottom: 0; background: var(--surface-soft); }
+.map-layer svg { width: 100%; height: 100%; display: block; }
+.live-head {
+  position: absolute; inset: 0 0 auto; z-index: 30;
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  background: rgba(255,255,255,0.88); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.live-sheet { position: absolute; left: 14px; right: 14px; bottom: 92px; z-index: 30; }
+.map-toggle {
+  display: flex; align-items: center; gap: 6px; margin: 0 auto 8px; height: 34px; padding: 0 14px;
+  border-radius: 999px; border: 1px solid var(--hairline-soft);
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(6px);
+  color: var(--body); font-size: 13px; box-shadow: var(--card-float);
+}
+.hint { margin: 0 auto 8px; width: fit-content; background: rgba(34,34,34,0.85); color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+
+.check-card {
+  position: relative; overflow: hidden; background: var(--canvas);
+  border: 1px solid var(--hairline-soft); border-radius: var(--r-lg); box-shadow: var(--card-float);
+  transition: background-color 0.3s ease;
+  animation: slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.check-card.done { background: var(--primary-soft); }
+.check-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.check-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 10px; }
+.check-items { list-style: none; margin: 0; padding: 0 20px; max-height: 264px; overflow-y: auto; }
+.check-items > li { padding: 14px 0; border-bottom: 1px solid var(--hairline-soft); }
+.yesno { display: flex; gap: 8px; margin-top: 10px; }
+.yesno button {
+  flex: 1; height: 40px; border-radius: var(--r-sm); border: 1px solid var(--hairline);
+  background: var(--surface-soft); color: var(--body); font-size: 14px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.yesno button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.stars { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+.stars button { border: 0; background: none; padding: 4px; line-height: 0; transition: transform 0.1s ease; }
+.stars button:active { transform: scale(0.9); }
+.stars .val { margin-left: 6px; font-size: 14px; color: var(--muted); }
+textarea.memo {
+  width: 100%; margin-top: 10px; resize: none; padding: 10px 12px;
+  border: 1px solid var(--hairline); border-radius: var(--r-sm);
+  background: var(--surface-soft); color: var(--body); font-family: var(--kr); font-size: 14px; line-height: 1.43;
+}
+textarea.memo:focus { border-color: var(--muted-soft); outline: none; }
+.photo-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--hairline-soft); }
+.photo-row img { width: 56px; height: 56px; border-radius: var(--r-sm); object-fit: cover; }
+.photo-btn {
+  height: 40px; padding: 0 16px; border-radius: var(--r-sm); border: 1px solid var(--hairline);
+  background: var(--surface-soft); color: var(--body); font-size: 14px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.check-foot { padding: 8px 20px 18px; }
+
+.hud {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; align-items: center; gap: 16px; padding: 14px 20px;
+  background: var(--canvas); border-top: 1px solid var(--hairline);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+.hud .step-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.hud .step-num { font-family: var(--num); font-size: 12px; font-weight: 700; color: var(--primary); letter-spacing: -0.01em; }
+.bar { height: 6px; border-radius: 999px; background: var(--surface-strong); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 999px; background: var(--primary); transition: width 0.3s ease; }
+.hud .cta { width: auto; padding: 0 22px; flex: none; height: 48px; font-size: 15px; }
+
+/* 리포트 */
+.report-head {
+  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.rating-card { margin: 20px; padding: 24px; border: 1px solid var(--hairline-soft); border-radius: var(--r-md); box-shadow: var(--card-float); }
+.rating-value { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin-top: 14px; }
+.layer-list { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 16px; }
+.layer-top { display: flex; align-items: baseline; justify-content: space-between; }
+.timeline { list-style: none; margin: 14px 20px 0; padding: 0 0 0 20px; border-left: 1px solid var(--hairline-soft); }
+.timeline > li { position: relative; padding-bottom: 26px; }
+.tl-dot { position: absolute; left: -26px; top: 6px; width: 12px; height: 12px; border-radius: 999px; border: 2px solid var(--canvas); }
+.tl-answers { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.tl-answers li { font-size: 14px; line-height: 1.43; }
+.tl-answers .q { color: var(--muted); }
+.tl-answers .a { color: var(--ink); margin-left: 6px; }
+.tl-answers .a.memo { color: var(--body); }
+.timeline img { margin-top: 12px; width: 100%; max-width: 260px; height: 150px; object-fit: cover; border-radius: var(--r-md); }
+.export { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px 20px 40px; }
+.export .cta { width: auto; padding: 0 20px; }
+.export .secondary { background: var(--canvas); color: var(--ink); border: 1px solid var(--hairline); }
+.export .secondary:hover { background: var(--surface-soft); }
+
+.empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 32px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="rail">
+    <header>
+      <p class="eyebrow">Walking field-study prototype</p>
+      <h1>WalkEstate<br><span class="kr">임장로드</span></h1>
+      <p class="lede">
+        가용 자산과 소득으로 실구매 상한가를 역산해 임장 후보지를 추천하고, 현장에서는 보행 전용 경로와
+        스마트 체크리스트로 안전·교육·주거 환경을 검증합니다. 오른쪽 화면은 목업이 아니라 실제로 동작하는
+        프로토타입입니다 — Next.js 저장소와 같은 계산식·같은 20개 시뮬레이션 지역을 씁니다.
+      </p>
+    </header>
+
+    <section>
+      <h2>화면 흐름</h2>
+      <ol class="steps" id="steps"></ol>
+    </section>
+
+    <section>
+      <h2>핵심 계산식</h2>
+      <dl class="formulas">
+        <div class="formula"><dt>매매 상한가</dt><dd>P_buy = (가용현금 + min(LTV 상한, DSR 40% 한도)) × 0.965</dd></div>
+        <div class="formula"><dt>전세 상한가</dt><dd>P_jeonse = 가용현금 + min(보증금 80%, 연소득 × 4.0)</dd></div>
+        <div class="formula"><dt>지역 추천 점수</dt><dd>Score_Area = 0.4·S_Turnover + 0.3·S_Density + 0.3·S_BudgetFit</dd></div>
+        <div class="formula"><dt>예상 소요 시간</dt><dd>ceil(거리 / 80m·분) + 체크포인트 수 × 3분, 급경사 ×1.2</dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>바로 해보기</h2>
+      <div class="rail-actions">
+        <button class="ghost-btn" data-demo="autofill">체크 9곳 자동 응답 → 리포트</button>
+        <button class="ghost-btn" data-demo="reset">진행 기록 초기화</button>
+      </div>
+      <p class="note" style="margin-top:18px">
+        지역명·거래량·수요밀도·경로는 데모용 시뮬레이션 데이터입니다. 지도는 API 키 없이 도는 0~100 가상 좌표
+        캔버스이며, 실제 지도로 옮길 때는 waypoint의 x·y를 위경도로 바꾸면 됩니다. 임장 진행 상황은 브라우저에
+        저장되어 새로고침해도 이어집니다.
+      </p>
+    </section>
+  </div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="screen" id="app"></div>
+    </div>
+    <p class="stage-caption" id="caption">390 × 844 · 실제 동작하는 프로토타입</p>
+  </div>
+</div>
+<script>
+/* ==================================================================
+   WalkEstate — 단일 파일 프로토타입
+   Next.js 저장소(src/utils, src/data)의 로직을 그대로 옮긴 구현입니다.
+   ================================================================== */
+
+/* ---------- 1. 디자인 토큰 매핑 ---------- */
+const LAYER = {
+  SAFETY:    { label: '안전환경', color: '#2a85ff', soft: '#eaf2ff', desc: '치안센터 · CCTV · 안심귀갓길' },
+  EDUCATION: { label: '교육환경', color: '#7f56d9', soft: '#f3eeff', desc: '초등학교 · 학원가 · 통학로' },
+  LIVING:    { label: '주거환경', color: '#00a699', soft: '#e6f7f5', desc: '역세권 거리 · 마트 · 단차/경사 · 공원' },
+};
+const THEME = {
+  HOT_TRADING:         { label: '거래량 1위',   color: '#ff385c', soft: '#fff0f2', desc: '최근 3개월 거래 회전율이 높아 시세 확인이 쉬운 동네' },
+  POPULAR_RESIDENTIAL: { label: '정주형 대단지', color: '#00a699', soft: '#e6f7f5', desc: '수요 밀도가 높고 실거주 만족도가 좋은 대단지 위주' },
+  BUDGET_PERFECT:      { label: '예산 맞춤형',  color: '#7f56d9', soft: '#f3eeff', desc: '지금 예산에 가장 잘 맞아떨어지는 가성비 후보' },
+};
+const THEME_ORDER = ['HOT_TRADING', 'POPULAR_RESIDENTIAL', 'BUDGET_PERFECT'];
+
+/* ---------- 2. 시뮬레이션 지역 20개 (예산 4티어 × 5) ---------- */
+function area(id, regionName, stationName, theme, badgeLabel, buy, jeonse, volume, density, demographic) {
+  return {
+    id, regionName, stationName, theme, badgeLabel,
+    priceRangeByType: { BUY: { min: buy[0], max: buy[1] }, JEONSE: { min: jeonse[0], max: jeonse[1] } },
+    metrics: { tradingVolumeLast3Months: volume, demandDensity: density, topDemographic: demographic },
+    highlightTags: [theme === 'HOT_TRADING' ? '#거래활발' : theme === 'POPULAR_RESIDENTIAL' ? '#정주형' : '#가성비', '#' + demographic],
+    recommendedRouteId: 'route-' + id,
+  };
+}
+const AREAS = [
+  area('a1', '화곡동', '화곡역', 'BUDGET_PERFECT', '예산 맞춤형', [25000,32000], [15000,19000], 42, 58, '1인가구'),
+  area('a2', '온수동', '온수역', 'HOT_TRADING', '거래량 1위', [27000,34000], [16000,20000], 71, 50, '신혼부부'),
+  area('a3', '오류동', '오류동역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [26000,33000], [16000,21000], 55, 66, '4인가구'),
+  area('a4', '쌍문동', '쌍문역', 'BUDGET_PERFECT', '예산 맞춤형', [28000,35000], [17000,22000], 48, 60, '신혼부부'),
+  area('a5', '중화동', '중화역', 'HOT_TRADING', '거래량 1위', [25000,31000], [15000,18000], 68, 47, '1인가구'),
+  area('b1', '신정동', '신정네거리역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [36000,48000], [23000,29000], 60, 70, '4인가구'),
+  area('b2', '방화동', '방화역', 'HOT_TRADING', '거래량 1위', [38000,50000], [24000,30000], 74, 55, '신혼부부'),
+  area('b3', '수유동', '수유역', 'BUDGET_PERFECT', '예산 맞춤형', [35000,45000], [22000,27000], 50, 62, '1인가구'),
+  area('b4', '상봉동', '상봉역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [40000,49000], [25000,30000], 58, 72, '4인가구'),
+  area('b5', '개봉동', '개봉역', 'HOT_TRADING', '거래량 1위', [37000,47000], [23000,28000], 70, 53, '신혼부부'),
+  area('c1', '봉천동', '서울대입구역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [52000,68000], [31000,42000], 63, 75, '4인가구'),
+  area('c2', '노량진', '노량진역', 'HOT_TRADING', '거래량 1위', [55000,70000], [33000,44000], 77, 60, '1인가구'),
+  area('c3', '미아동', '미아사거리역', 'BUDGET_PERFECT', '예산 맞춤형', [50000,63000], [30000,38000], 52, 65, '신혼부부'),
+  area('c4', '천호동', '천호역', 'HOT_TRADING', '거래량 1위', [53000,69000], [32000,43000], 72, 58, '4인가구'),
+  area('c5', '구로디지털단지', '구로디지털단지역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [54000,67000], [31000,41000], 65, 78, '1인가구'),
+  area('d1', '상수동', '상수역', 'HOT_TRADING', '거래량 1위', [75000,98000], [46000,58000], 80, 62, '신혼부부'),
+  area('d2', '망원동', '망원역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [72000,95000], [45000,56000], 66, 80, '4인가구'),
+  area('d3', '연신내', '연신내역', 'BUDGET_PERFECT', '예산 맞춤형', [70000,90000], [45000,55000], 54, 68, '1인가구'),
+  area('d4', '신길동', '신길역', 'HOT_TRADING', '거래량 1위', [78000,100000], [47000,60000], 82, 60, '신혼부부'),
+  area('d5', '성내동', '강동구청역', 'POPULAR_RESIDENTIAL', '정주형 대단지', [74000,96000], [46000,57000], 64, 76, '4인가구'),
+];
+const areaById = (id) => AREAS.find((a) => a.id === id);
+const areaByRoute = (routeId) => AREAS.find((a) => a.recommendedRouteId === routeId);
+
+/* ---------- 3. 금융 엔진 (finance.ts) ---------- */
+const LTV_RATE = 0.70;
+const DSR_MULTIPLIER = 17.1;
+
+function calculateMaxAffordablePrice(profile, estimatedPropertyPrice) {
+  const { availableCash, annualIncome, existingLoanAnnualRepayment, transactionType } = profile;
+  if (transactionType === 'BUY') {
+    const ltvLimit = (estimatedPropertyPrice ?? availableCash * 3) * LTV_RATE;
+    const maxAnnualDebtService = Math.max(0, annualIncome * 0.4 - existingLoanAnnualRepayment);
+    const loanLimit = Math.min(ltvLimit, maxAnnualDebtService * DSR_MULTIPLIER);
+    return Math.floor((availableCash + loanLimit) * 0.965);
+  }
+  if (transactionType === 'JEONSE') {
+    const loanLimit = Math.min(availableCash * 0.8, annualIncome * 4.0);
+    return Math.floor(availableCash + loanLimit);
+  }
+  return availableCash;
+}
+
+function formatKrwManwon(manwon) {
+  const safe = Math.max(0, Math.round(manwon));
+  const eok = Math.floor(safe / 10000);
+  const rest = safe % 10000;
+  if (eok === 0) return rest.toLocaleString('ko-KR') + '만';
+  if (rest === 0) return eok + '억';
+  return eok + '억 ' + rest.toLocaleString('ko-KR') + '만';
+}
+
+/* ---------- 4. waypoint 생성 (simulatedRoutes.ts) ---------- */
+const METERS_PER_UNIT = 15;
+const CATEGORY_ORDER = ['LIVING','SAFETY','EDUCATION','LIVING','SAFETY','EDUCATION','LIVING','SAFETY','EDUCATION'];
+const WP_NAMES = {
+  LIVING: ['{station} 역세권 도보 구간', '{region} 생활 상권 & 마트', '{region} 근린공원 산책로'],
+  SAFETY: ['{region} 안심귀갓길', '{region} 치안센터 앞 골목', '{region} 야간 가로등 구간'],
+  EDUCATION: ['{region}초등학교 통학로', '{region} 학원가 밀집 구역', '{region} 통학 횡단보도'],
+};
+const CHECKS = {
+  SAFETY: [
+    { question: 'CCTV·비상벨이 사각지대 없이 설치되어 있나요?', type: 'BOOLEAN' },
+    { question: '야간 가로등 밝기는 충분한가요?', type: 'RATING' },
+    { question: '골목의 개방감과 체감 치안은 어떤가요?', type: 'RATING' },
+    { question: '현장에서 느낀 점을 메모해주세요', type: 'TEXT' },
+  ],
+  EDUCATION: [
+    { question: '차도와 분리된 안전한 통학로가 확보되어 있나요?', type: 'BOOLEAN' },
+    { question: '횡단보도·신호 체계는 통학에 충분한가요?', type: 'RATING' },
+    { question: '학원가·도서관 등 학습 인프라 접근성은 어떤가요?', type: 'RATING' },
+    { question: '통학로에서 발견한 위험 요소를 메모해주세요', type: 'TEXT' },
+  ],
+  LIVING: [
+    { question: '체감 도보 시간이 광고된 역세권 거리와 일치하나요?', type: 'BOOLEAN' },
+    { question: '단차·경사 없이 평지 보행이 가능한가요?', type: 'RATING' },
+    { question: '마트·병원 등 생활 편의시설 접근성은 어떤가요?', type: 'RATING' },
+    { question: '주거 환경에 대한 인상을 메모해주세요', type: 'TEXT' },
+  ],
+};
+
+function hashSeed(input) {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i += 1) { h ^= input.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function createRandom(seed) {
+  let s = seed;
+  return () => {
+    s |= 0; s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const clampCoord = (v) => Math.min(94, Math.max(6, v));
+
+function generateWaypoints(a) {
+  const random = createRandom(hashSeed(a.id + a.regionName));
+  const startAngle = random() * Math.PI * 2;
+  const counters = { SAFETY: 0, EDUCATION: 0, LIVING: 0 };
+  return CATEGORY_ORDER.map((category, index) => {
+    const nameIndex = counters[category] % WP_NAMES[category].length;
+    counters[category] += 1;
+    const angle = startAngle + (index / CATEGORY_ORDER.length) * Math.PI * 2;
+    const radius = 26 + random() * 12;
+    const x = clampCoord(50 + Math.cos(angle) * radius + (random() - 0.5) * 6);
+    const y = clampCoord(50 + Math.sin(angle) * radius * 0.82 + (random() - 0.5) * 6);
+    const id = a.recommendedRouteId + '-wp' + (index + 1);
+    return {
+      id, order: index + 1, category,
+      name: WP_NAMES[category][nameIndex].replace('{region}', a.regionName).replace('{station}', a.stationName),
+      x: Number(x.toFixed(2)), y: Number(y.toFixed(2)),
+      checkItems: CHECKS[category].map((c, i) => ({ id: id + '-c' + (i + 1), question: c.question, type: c.type })),
+      isCompleted: false,
+    };
+  });
+}
+
+/* ---------- 5. 스코어링 (scoring.ts) ---------- */
+const AREA_SCORE_WEIGHTS = { turnover: 0.4, density: 0.3, budgetFit: 0.3 };
+const AVG_WALK_SPEED_M_PER_MIN = 80;
+const CHECKPOINT_AVG_MINUTES = 3;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const normalize = (v, min, max) => (max === min ? 0.5 : clamp01((v - min) / (max - min)));
+const applySlopeAdjustment = (meters, slopeFactor = 1) => meters * slopeFactor;
+const estimateWalkMinutes = (meters, slopeFactor = 1) => Math.ceil(applySlopeAdjustment(meters, slopeFactor) / AVG_WALK_SPEED_M_PER_MIN);
+const estimateTotalMinutes = (walkMinutes, count) => walkMinutes + count * CHECKPOINT_AVG_MINUTES;
+
+function calculateAreaScore(a, userMaxAffordable, all = AREAS, deal = 'BUY') {
+  const volumes = all.map((x) => x.metrics.tradingVolumeLast3Months);
+  const densities = all.map((x) => x.metrics.demandDensity);
+  const sTurnover = normalize(a.metrics.tradingVolumeLast3Months, Math.min(...volumes), Math.max(...volumes));
+  const sDensity = normalize(a.metrics.demandDensity, Math.min(...densities), Math.max(...densities));
+  const { min, max } = a.priceRangeByType[deal];
+  const target = (min + max) / 2;
+  const sBudgetFit = userMaxAffordable > 0 ? clamp01(1 - Math.abs(target - userMaxAffordable) / userMaxAffordable) : 0;
+  const score = AREA_SCORE_WEIGHTS.turnover * sTurnover + AREA_SCORE_WEIGHTS.density * sDensity + AREA_SCORE_WEIGHTS.budgetFit * sBudgetFit;
+  return Number((score * 100).toFixed(1));
+}
+
+function buildRoute(a) {
+  const waypoints = generateWaypoints(a);
+  const segmentDistances = [];
+  const segmentSlopeFactors = [];
+  for (let i = 0; i < waypoints.length - 1; i += 1) {
+    const raw = Math.hypot(waypoints[i + 1].x - waypoints[i].x, waypoints[i + 1].y - waypoints[i].y) * METERS_PER_UNIT;
+    const isSteep = (waypoints[i].x + waypoints[i + 1].y) % 5 < 1.6;
+    segmentDistances.push(raw);
+    segmentSlopeFactors.push(isSteep ? 1.2 : 1);
+  }
+  const adjusted = segmentDistances.reduce((sum, d, i) => sum + applySlopeAdjustment(d, segmentSlopeFactors[i]), 0);
+  const totalDistanceMeters = Math.round(segmentDistances.reduce((sum, d) => sum + d, 0));
+  const walkMinutes = estimateWalkMinutes(adjusted);
+  return {
+    routeId: a.recommendedRouteId, areaId: a.id, waypoints, segmentDistances, segmentSlopeFactors,
+    totalDistanceMeters, walkMinutes, totalMinutes: estimateTotalMinutes(walkMinutes, waypoints.length),
+  };
+}
+
+function calculateLayerScore(waypoints, category) {
+  const scores = [];
+  waypoints.filter((w) => w.category === category).forEach((w) => {
+    w.checkItems.forEach((item) => {
+      if (item.type === 'RATING' && typeof item.value === 'number') scores.push(item.value);
+      if (item.type === 'BOOLEAN' && typeof item.value === 'boolean') scores.push(item.value ? 5 : 2);
+    });
+  });
+  if (!scores.length) return 0;
+  return Number((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1));
+}
+const layerScores = (waypoints) => ({
+  SAFETY: calculateLayerScore(waypoints, 'SAFETY'),
+  EDUCATION: calculateLayerScore(waypoints, 'EDUCATION'),
+  LIVING: calculateLayerScore(waypoints, 'LIVING'),
+});
+function calculateOverallRating(waypoints) {
+  const scores = Object.values(layerScores(waypoints)).filter((s) => s > 0);
+  if (!scores.length) return 0;
+  return Number((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1));
+}
+
+/* 최소 3개 추천 보장 — 예산/테마 조건을 단계적으로 완화 */
+function recommendAreas(userMaxAffordable, deal, preferredTheme, minResults = 3) {
+  const fitsBudget = (a, tolerance) => {
+    const { min, max } = a.priceRangeByType[deal];
+    return userMaxAffordable >= min * (1 - tolerance) && userMaxAffordable <= max * (1 + tolerance);
+  };
+  let candidates = AREAS.filter((a) => (!preferredTheme || a.theme === preferredTheme) && fitsBudget(a, 0));
+  for (const tolerance of [0.2, 0.4, 0.6]) {
+    if (candidates.length >= minResults) break;
+    candidates = AREAS.filter((a) => (!preferredTheme || a.theme === preferredTheme) && fitsBudget(a, tolerance));
+  }
+  if (candidates.length < minResults) candidates = AREAS.filter((a) => fitsBudget(a, 0.6));
+  if (candidates.length < minResults) candidates = AREAS.slice();
+  return candidates
+    .map((a) => ({ a, score: calculateAreaScore(a, userMaxAffordable, AREAS, deal) }))
+    .sort((x, y) => y.score - x.score)
+    .slice(0, Math.max(minResults, 3))
+    .map((x) => x.a);
+}
+
+/* ---------- 6. 세션 저장 (localStorage) ---------- */
+const KEY = (routeId) => 'walkestate:session:' + routeId;
+function loadSession(routeId) {
+  try { const raw = localStorage.getItem(KEY(routeId)); return raw ? JSON.parse(raw) : null; }
+  catch { return null; }
+}
+function saveSession(session) {
+  try { localStorage.setItem(KEY(session.routeId), JSON.stringify(session)); }
+  catch { /* 저장 공간이 부족해도 임장은 계속 진행된다 */ }
+}
+function clearSessions() {
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('walkestate:session:')).forEach((k) => localStorage.removeItem(k));
+  } catch { /* noop */ }
+}
+function compressImageFile(file, maxSize = 480) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('사진을 읽지 못했습니다.'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('사진을 불러오지 못했습니다.'));
+      image.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('사진을 변환하지 못했습니다.')); return; }
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+</script>
+<style>
+@keyframes we-pulse { 0% { transform: scale(1); opacity: 0.45; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+.we-pulse { animation: we-pulse 1.9s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+.we-here { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.toast {
+  position: absolute; left: 50%; bottom: 108px; transform: translateX(-50%); z-index: 60;
+  background: rgba(34,34,34,0.9); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px;
+}
+</style>
+<script>
+/* ==================================================================
+   화면 렌더링 — 홈 / 루트 브리핑 / 실시간 임장 / 리포트
+   ================================================================== */
+const app = document.getElementById('app');
+const caption = document.getElementById('caption');
+
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  trend: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  checks: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  up: '<path d="m18 15-6-6-6 6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><path d="M12 15V3"/>',
+  copy: '<rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+};
+const icon = (name, size = 15, sw = 2) =>
+  '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + sw +
+  '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none">' + ICONS[name] + '</svg>';
+const star = (filled) =>
+  '<svg width="26" height="26" viewBox="0 0 24 24" fill="' + (filled ? '#ff385c' : 'none') + '" stroke="' + (filled ? '#ff385c' : '#dddddd') +
+  '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- 상태 ---------- */
+const state = {
+  screen: 'home',
+  profile: { availableCash: 20000, annualIncome: 7000, existingLoanAnnualRepayment: 0, transactionType: 'BUY' },
+  targetMinutes: 60,
+  regionId: '',
+  panelOpen: false,
+  briefingAreaId: null,
+  routeId: null,
+  sheetOpen: true,
+  hint: '',
+  toast: '',
+};
+const maxAffordable = () => calculateMaxAffordablePrice(state.profile);
+const deal = () => state.profile.transactionType;
+
+function currentSession(routeId) {
+  const a = areaByRoute(routeId);
+  const route = buildRoute(a);
+  const saved = loadSession(routeId);
+  if (saved && saved.waypoints && saved.waypoints.length === route.waypoints.length) return { a, route, session: saved };
+  return {
+    a, route,
+    session: {
+      routeId, areaId: a.id, startedAt: new Date().toISOString(),
+      waypoints: route.waypoints, photos: {},
+      totalDistanceMeters: route.totalDistanceMeters, walkMinutes: route.walkMinutes, totalMinutes: route.totalMinutes,
+    },
+  };
+}
+
+/* ---------- 시뮬레이션 경로 캔버스 ---------- */
+function shortLabel(name) {
+  const i = name.indexOf(' ');
+  const t = i > 0 ? name.slice(i + 1) : name;
+  return t.length > 10 ? t.slice(0, 10) + '…' : t;
+}
+function mapSvg(waypoints, opts) {
+  const o = Object.assign({ activeIndex: 0, showLabels: false, showCurrent: false, align: 'center' }, opts || {});
+  const pts = waypoints.slice().sort((a, b) => a.order - b.order);
+  const full = pts.map((p) => p.x + ',' + p.y).join(' ');
+  const travelled = pts.slice(0, Math.min(o.activeIndex + 1, pts.length)).map((p) => p.x + ',' + p.y).join(' ');
+  const here = pts[Math.min(o.activeIndex, pts.length - 1)];
+  const markers = pts.map((w) => {
+    const m = LAYER[w.category];
+    const active = w.order - 1 === o.activeIndex;
+    const label = o.showLabels
+      ? '<text x="' + w.x + '" y="' + (w.order % 2 === 0 ? w.y - 4.8 : w.y + 7) + '" text-anchor="middle" font-size="2.5" font-weight="600" fill="#3f3f3f">' + esc(shortLabel(w.name)) + '</text>'
+      : '';
+    return '<g>' +
+      '<circle cx="' + w.x + '" cy="' + w.y + '" r="' + (active ? 3.6 : 3) + '" fill="' + (w.isCompleted ? m.color : '#ffffff') + '" stroke="' + m.color + '" stroke-width="1.4"/>' +
+      '<text x="' + w.x + '" y="' + (w.y + 1.1) + '" text-anchor="middle" font-size="3" font-weight="700" fill="' + (w.isCompleted ? '#ffffff' : m.color) + '">' + w.order + '</text>' +
+      label + '</g>';
+  }).join('');
+  const current = o.showCurrent && here
+    ? '<g class="we-here" style="transform: translate(' + here.x + 'px, ' + here.y + 'px)">' +
+      '<circle r="3.2" fill="#ff385c" opacity="0.45" class="we-pulse"/><circle r="2" fill="#ff385c" stroke="#ffffff" stroke-width="1"/></g>'
+    : '';
+  return '<svg viewBox="0 0 100 100" preserveAspectRatio="' + (o.align === 'top' ? 'xMidYMin meet' : 'xMidYMid meet') + '" role="img" aria-label="도보 임장 경로 시뮬레이션">' +
+    '<defs><pattern id="we-grid" width="10" height="10" patternUnits="userSpaceOnUse">' +
+    '<rect width="10" height="10" fill="#f7f7f7"/><path d="M10 0 L0 0 0 10" fill="none" stroke="#ebebeb" stroke-width="0.5"/></pattern></defs>' +
+    '<rect x="-300" y="-300" width="700" height="700" fill="url(#we-grid)"/>' +
+    '<g stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" opacity="0.95">' +
+    '<line x1="-300" y1="30" x2="400" y2="30"/><line x1="-300" y1="72" x2="400" y2="72"/>' +
+    '<line x1="24" y1="-300" x2="24" y2="400"/><line x1="70" y1="-300" x2="70" y2="400"/></g>' +
+    '<g fill="#eef1f0" opacity="0.9"><rect x="30" y="36" width="14" height="10" rx="1.5"/><rect x="52" y="40" width="12" height="12" rx="1.5"/>' +
+    '<rect x="78" y="52" width="14" height="12" rx="1.5"/><rect x="8" y="52" width="12" height="14" rx="1.5"/></g>' +
+    '<polyline points="' + full + '" fill="none" stroke="#ffd1da" stroke-width="1.8" stroke-dasharray="3 2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+    (pts.length > 1 ? '<polyline points="' + travelled + '" fill="none" stroke="#ff385c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' : '') +
+    markers + current + '</svg>';
+}
+
+/* ---------- 홈 ---------- */
+function townCard(a, score) {
+  const t = THEME[a.theme];
+  const range = a.priceRangeByType[deal()];
+  return '<button class="town" data-act="open-brief" data-id="' + a.id + '">' +
+    '<span class="badge t-badge" style="color:' + t.color + ';background:' + t.soft + '">' + esc(a.badgeLabel) + '</span>' +
+    '<span class="town-top"><span style="min-width:0">' +
+      '<span class="t-title-md" style="display:block">' + esc(a.regionName) + '</span>' +
+      '<span class="t-body-sm" style="display:flex;align-items:center;gap:4px;color:var(--muted);margin-top:2px">' + icon('pin', 13) + esc(a.stationName) + '</span>' +
+    '</span><span class="score" style="background:' + t.color + '" title="Score_Area = 0.4·거래량 + 0.3·수요밀도 + 0.3·예산적합도">' + score.toFixed(1) + '</span></span>' +
+    '<span class="t-body-sm" style="display:block;color:var(--muted);margin-top:12px">' +
+      (deal() === 'BUY' ? '매매' : '전세') + ' ' + formatKrwManwon(range.min) + ' ~ ' + formatKrwManwon(range.max) + '</span>' +
+    '<span class="metrics t-body-sm"><span>' + icon('trend', 13) + '3개월 ' + a.metrics.tradingVolumeLast3Months + '건</span>' +
+      '<span>' + icon('users', 13) + esc(a.metrics.topDemographic) + '</span></span>' +
+    '<span class="tags">' + a.highlightTags.map((tag) => '<span class="tag t-badge">' + esc(tag) + '</span>').join('') + '</span>' +
+  '</button>';
+}
+
+function homeHtml() {
+  const max = maxAffordable();
+  const pinned = state.regionId ? areaById(state.regionId) : null;
+  const groups = THEME_ORDER.map((theme) => ({
+    theme,
+    areas: recommendAreas(max, deal(), theme).filter((a) => a.id !== state.regionId),
+  }));
+  const groupHtml = (title, sub, areas) => !areas.length ? '' :
+    '<section class="group"><h3>' + esc(title) + '</h3><p class="sub">' + esc(sub) + '</p><div class="cards">' +
+    areas.map((a) => townCard(a, calculateAreaScore(a, max, AREAS, deal()))).join('') + '</div></section>';
+
+  return '<div class="scroll" id="home-scroll">' +
+    '<header class="app-header">' +
+      '<span class="logo-mark" style="color:var(--primary)">' + icon('compass', 22, 2.4) + '</span>' +
+      '<span class="brand">WalkEstate</span><span class="brand-kr">임장로드</span>' +
+    '</header>' +
+
+    '<section class="hero">' +
+      '<p class="t-display" style="text-align:center">예산에 맞는 동네를 찾고,<br>발로 확인하세요</p>' +
+      '<p class="t-body-sm" style="text-align:center;color:var(--muted);margin:8px 0 0;line-height:1.5">가용 자산·소득으로 실구매 상한가를 역산하고,<br>안전·교육·주거 환경을 걸으며 검증합니다.</p>' +
+
+      '<div class="pill">' +
+        '<button class="seg" data-act="seg" aria-expanded="' + (state.panelOpen ? 'true' : 'false') + '">' +
+          '<span class="lbl">지역</span><span class="val">' + esc(pinned ? pinned.regionName : '어디든 추천') + '</span></button>' +
+        '<button class="seg" data-act="seg" aria-expanded="' + (state.panelOpen ? 'true' : 'false') + '">' +
+          '<span class="lbl">가용 예산 · ' + (deal() === 'BUY' ? '매매' : '전세') + '</span>' +
+          '<span class="val soft num">' + formatKrwManwon(max) + '</span></button>' +
+        '<button class="seg-search" data-act="seg" aria-label="임장 후보지 검색">' + icon('search', 20, 2.5) + '</button>' +
+      '</div>' +
+
+      '<div class="panel"' + (state.panelOpen ? '' : ' hidden') + '>' +
+        '<label class="field"><span>지역</span><select class="input" data-k="region" data-focus="region">' +
+          '<option value=""' + (state.regionId ? '' : ' selected') + '>어디든 추천받기</option>' +
+          AREAS.map((a) => '<option value="' + a.id + '"' + (state.regionId === a.id ? ' selected' : '') + '>' + esc(a.regionName) + ' (' + esc(a.stationName) + ')</option>').join('') +
+        '</select></label>' +
+        '<div class="field"><span>거래 유형</span><div class="toggle">' +
+          '<button data-act="deal" data-v="BUY" aria-pressed="' + (deal() === 'BUY') + '">매매</button>' +
+          '<button data-act="deal" data-v="JEONSE" aria-pressed="' + (deal() === 'JEONSE') + '">전세</button>' +
+        '</div></div>' +
+        '<label class="field"><span>가용 현금 (만원)</span><input class="input" type="number" min="0" step="500" data-k="cash" data-focus="cash" value="' + state.profile.availableCash + '"></label>' +
+        '<label class="field"><span>연 소득 (만원)</span><input class="input" type="number" min="0" step="100" data-k="income" data-focus="income" value="' + state.profile.annualIncome + '"></label>' +
+        '<label class="field"><span>기존 대출 연 상환액 (만원)</span><input class="input" type="number" min="0" step="100" data-k="loan" data-focus="loan" value="' + state.profile.existingLoanAnnualRepayment + '"></label>' +
+        '<label class="field"><span>목표 임장 시간 · ' + state.targetMinutes + '분</span>' +
+          '<input type="range" min="30" max="90" step="10" data-k="target" data-focus="target" value="' + state.targetMinutes + '"></label>' +
+        '<div class="budget-out"><span style="color:var(--primary)">' + icon('search', 15) + '</span>' +
+          '<span class="t-caption num">' + (deal() === 'BUY' ? '매매' : '전세') + ' 상한가 ' + formatKrwManwon(max) + '</span>' +
+          '<span class="t-body-sm" style="color:var(--muted)">' +
+          (deal() === 'BUY' ? '(가용현금 + min(LTV 상한, DSR 40% 한도)) × 0.965' : '가용현금 + min(보증금 80%, 연소득 × 4.0)') + '</span></div>' +
+      '</div>' +
+    '</section>' +
+
+    (pinned ? groupHtml('선택한 지역', '직접 고른 동네의 도보 임장 루트입니다.', [pinned]) : '') +
+    groups.map((g) => groupHtml(THEME[g.theme].label, THEME[g.theme].desc, g.areas)).join('') +
+
+    '<p class="foot-note">' + icon('info', 15) + '<span>지역·지표·경로는 데모용 시뮬레이션 데이터이며, 점수는 Score_Area = 0.4·거래량 + 0.3·수요밀도 + 0.3·예산적합도 로 계산한 100점 환산값입니다.</span></p>' +
+  '</div>' + (state.briefingAreaId ? briefingHtml() : '');
+}
+
+/* ---------- 루트 브리핑 시트 ---------- */
+function briefingHtml() {
+  const a = areaById(state.briefingAreaId);
+  const route = buildRoute(a);
+  const t = THEME[a.theme];
+  const diff = route.totalMinutes - state.targetMinutes;
+  return '<div class="overlay"><button class="scrim" data-act="close-brief" aria-label="닫기"></button><div class="sheet">' +
+    '<div class="sheet-head"><div>' +
+      '<span class="badge t-badge" style="color:' + t.color + ';background:' + t.soft + '">' + esc(a.badgeLabel) + '</span>' +
+      '<p class="t-display" style="margin:8px 0 0">' + esc(a.regionName) + ' 도보 임장 루트</p>' +
+      '<p class="t-body-sm" style="margin:2px 0 0;color:var(--muted)">' + esc(a.stationName) + ' 출발 · 체크포인트 ' + route.waypoints.length + '곳</p>' +
+    '</div><button class="icon-btn" data-act="close-brief" aria-label="닫기">' + icon('x', 18, 2.2) + '</button></div>' +
+
+    '<div class="sheet-body">' +
+      '<div style="height:200px;border-bottom:1px solid var(--hairline-soft);background:var(--surface-soft)">' + mapSvg(route.waypoints, { showLabels: true }) + '</div>' +
+      '<div class="stats">' +
+        '<div class="stat"><span class="k">' + icon('route', 14) + '총 이동 거리</span><span class="v">' + (route.totalDistanceMeters / 1000).toFixed(1) + 'km</span></div>' +
+        '<div class="stat"><span class="k">' + icon('clock', 14) + '도보 시간</span><span class="v">' + route.walkMinutes + '분</span></div>' +
+        '<div class="stat"><span class="k">' + icon('checks', 14) + '이동 + 체크</span><span class="v">' + route.totalMinutes + '분</span></div>' +
+      '</div>' +
+      '<p class="t-body-sm" style="padding:14px 20px 0;color:var(--muted)">분당 80m 기준 이동 ' + route.walkMinutes + '분 + 체크포인트 ' + route.waypoints.length + '곳 × 3분 = ' +
+        '<span style="color:var(--ink)">' + route.totalMinutes + '분</span>' +
+        (diff > 0 ? '<span style="color:var(--primary)"> · 목표 ' + state.targetMinutes + '분보다 ' + diff + '분 깁니다</span>'
+                  : '<span style="color:var(--living)"> · 목표 ' + state.targetMinutes + '분 안에 완주 가능</span>') + '</p>' +
+      '<ol class="wp-list">' + route.waypoints.map((w, i) => {
+        const m = LAYER[w.category];
+        const steep = route.segmentSlopeFactors[i] > 1;
+        return '<li class="wp-row"><span class="wp-dot" style="background:' + m.color + '">' + w.order + '</span>' +
+          '<span style="min-width:0"><span class="t-body-sm" style="display:block">' + esc(w.name) + '</span>' +
+          '<span class="wp-meta"><span style="color:' + m.color + '">' + m.label + '</span>' +
+          (i < route.segmentDistances.length ? '<span>다음 구간 ' + Math.round(route.segmentDistances[i]) + 'm</span>' : '') +
+          (steep ? '<span style="color:var(--primary);display:inline-flex;align-items:center;gap:3px">' + icon('mountain', 12) + '급경사</span>' : '') +
+          '</span></span></li>';
+      }).join('') + '</ol>' +
+    '</div>' +
+    '<div class="sheet-foot"><button class="cta" data-act="start" data-id="' + route.routeId + '">현장 임장 시작하기</button></div>' +
+  '</div></div>';
+}
+</script>
+<script>
+/* ---------- 실시간 현장 임장 모드 ---------- */
+const isAnswered = (item) =>
+  item.type === 'BOOLEAN' ? typeof item.value === 'boolean'
+  : item.type === 'RATING' ? typeof item.value === 'number' && item.value > 0
+  : true;
+
+function liveHtml() {
+  const { a, route, session } = currentSession(state.routeId);
+  let activeIndex = session.waypoints.findIndex((w) => !w.isCompleted);
+  if (activeIndex === -1) activeIndex = session.waypoints.length - 1;
+  const wp = session.waypoints[activeIndex];
+  const m = LAYER[wp.category];
+  const done = session.waypoints.filter((w) => w.isCompleted).length;
+  const remaining = Math.round(route.segmentDistances.slice(activeIndex).reduce((s, d) => s + d, 0));
+  const allAnswered = wp.checkItems.every(isAnswered);
+  const photo = session.photos[wp.id];
+
+  const items = wp.checkItems.map((item) => {
+    let control = '';
+    if (item.type === 'BOOLEAN') {
+      control = '<div class="yesno">' +
+        '<button data-act="bool" data-id="' + item.id + '" data-v="1" aria-pressed="' + (item.value === true) + '">' + icon('check', 15, 2.5) + '예</button>' +
+        '<button data-act="bool" data-id="' + item.id + '" data-v="0" aria-pressed="' + (item.value === false) + '">' + icon('x', 15, 2.5) + '아니오</button></div>';
+    } else if (item.type === 'RATING') {
+      control = '<div class="stars">' +
+        [1, 2, 3, 4, 5].map((n) => '<button data-act="rate" data-id="' + item.id + '" data-v="' + n + '" aria-label="' + n + '점">' +
+          star(typeof item.value === 'number' && item.value >= n) + '</button>').join('') +
+        '<span class="val num">' + (typeof item.value === 'number' ? item.value + '점' : '미응답') + '</span></div>';
+    } else {
+      control = '<textarea class="memo" rows="2" data-k="memo" data-id="' + item.id + '" data-focus="memo-' + item.id + '" ' +
+        'placeholder="선택 입력 — 리포트 타임라인에 그대로 기록됩니다">' + esc(item.value || '') + '</textarea>';
+    }
+    return '<li><p class="t-body-sm" style="margin:0;color:var(--body)">' + esc(item.question) + '</p>' + control + '</li>';
+  }).join('');
+
+  return '<div class="map-layer">' + mapSvg(session.waypoints, { activeIndex, showCurrent: true, align: 'top' }) + '</div>' +
+
+    '<header class="live-head">' +
+      '<button class="icon-btn" data-act="exit" aria-label="임장 중단하고 나가기">' + icon('x', 18, 2.2) + '</button>' +
+      '<div style="flex:1;min-width:0">' +
+        '<p class="t-caption" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.regionName) + ' · ' + esc(a.stationName) + '</p>' +
+        '<p class="t-body-sm" style="margin:2px 0 0;color:var(--muted);display:flex;align-items:center;gap:6px">' +
+          '<span style="color:' + m.color + '">' + m.label + '</span><span style="color:var(--hairline)">|</span>' +
+          icon('route', 13) + '남은 거리 <span class="num">' + remaining + 'm</span></p>' +
+      '</div>' +
+      '<span class="t-caption num" style="background:var(--primary-soft);color:var(--primary);border-radius:999px;padding:4px 12px">' + done + '/' + session.waypoints.length + '</span>' +
+    '</header>' +
+
+    '<div class="live-sheet">' +
+      '<button class="map-toggle" data-act="toggle-sheet">' + icon(state.sheetOpen ? 'down' : 'up', 15) +
+        (state.sheetOpen ? '지도 더 보기' : '체크포인트 ' + wp.order + ' 열기') + '</button>' +
+      (state.hint ? '<p class="hint">' + esc(state.hint) + '</p>' : '') +
+      (state.sheetOpen ?
+        '<section class="check-card' + (allAnswered ? ' done' : '') + '">' +
+          '<span class="check-bar" style="background:' + m.color + '"></span>' +
+          '<div class="check-head"><div style="min-width:0">' +
+            '<p class="t-title-sm" style="margin:0">' + esc(wp.name) + '</p>' +
+            '<p class="t-body-sm" style="margin:4px 0 0;color:var(--muted)">' + m.desc + '</p></div>' +
+            '<span class="badge t-badge" style="color:' + m.color + ';background:' + m.soft + '">' + m.label + '</span></div>' +
+          '<ul class="check-items">' + items +
+            '<li class="photo-row" style="border-bottom:0">' +
+              (photo ? '<img src="' + photo + '" alt="현장 사진">' : '') +
+              '<button class="photo-btn" data-act="photo">' + icon('camera', 16) + (photo ? '사진 다시 찍기' : '현장 사진 남기기') + '</button>' +
+            '</li>' +
+          '</ul>' +
+          '<div class="check-foot"><button class="cta" data-act="complete"' + (allAnswered ? '' : ' disabled') + '>' +
+            (allAnswered ? '이 체크포인트 완료' : '모든 항목에 응답해주세요') + '</button></div>' +
+        '</section>' : '') +
+    '</div>' +
+
+    '<div class="hud"><div style="flex:1;min-width:0">' +
+      '<div class="step-label"><span class="step-num">STEP ' + (activeIndex + 1) + '/' + session.waypoints.length + '</span>' +
+      '<span class="t-body-sm" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(wp.name) + '</span></div>' +
+      '<div class="bar"><i style="width:' + ((activeIndex + 1) / session.waypoints.length) * 100 + '%"></i></div>' +
+    '</div><button class="cta" data-act="complete">체크 완료</button></div>' +
+    (state.toast ? '<p class="toast">' + esc(state.toast) + '</p>' : '');
+}
+
+/* ---------- 임장 완료 리포트 ---------- */
+const answerText = (item) =>
+  item.type === 'BOOLEAN' ? (typeof item.value === 'boolean' ? (item.value ? '예' : '아니오') : '미응답')
+  : item.type === 'RATING' ? (typeof item.value === 'number' ? item.value + '/5점' : '미응답')
+  : (typeof item.value === 'string' && item.value.trim() ? item.value : '메모 없음');
+
+function reportMarkdown(a, session, overall, layers) {
+  const lines = ['# ' + a.regionName + ' 임장 리포트', '',
+    '- 위치: ' + a.regionName + ' · ' + a.stationName,
+    '- 종합 거주 평점: ' + overall.toFixed(1) + ' / 5.0',
+    '- 안전 ' + layers.SAFETY.toFixed(1) + ' · 교육 ' + layers.EDUCATION.toFixed(1) + ' · 주거 ' + layers.LIVING.toFixed(1),
+    '- 이동 ' + (session.totalDistanceMeters / 1000).toFixed(1) + 'km · 도보 ' + session.walkMinutes + '분 · 총 ' + session.totalMinutes + '분',
+    '', '## 체크포인트', ''];
+  session.waypoints.forEach((w) => {
+    lines.push('### ' + w.order + '. ' + w.name + ' (' + LAYER[w.category].label + ')');
+    w.checkItems.forEach((item) => lines.push('- ' + item.question + ' → ' + answerText(item)));
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+function reportHtml() {
+  const { a, session } = currentSession(state.routeId);
+  const answered = session.waypoints.some((w) => w.checkItems.some((i) => i.value !== undefined));
+  if (!answered) {
+    return '<div class="empty">' +
+      '<p class="t-display" style="margin:0">아직 임장 기록이 없습니다</p>' +
+      '<p class="t-body" style="margin:0;color:var(--muted)">' + esc(a.regionName) + ' 루트를 걸으며 체크포인트에 응답하면 리포트가 만들어집니다.</p>' +
+      '<button class="cta" style="width:auto;padding:0 24px;margin-top:6px" data-act="start" data-id="' + session.routeId + '">임장 시작하기</button>' +
+      '<button class="t-body-sm" data-act="exit" style="border:0;background:none;color:var(--muted);text-decoration:underline">홈으로 돌아가기</button>' +
+    '</div>';
+  }
+  const overall = calculateOverallRating(session.waypoints);
+  const layers = layerScores(session.waypoints);
+  const done = session.waypoints.filter((w) => w.isCompleted).length;
+
+  return '<div class="scroll" id="report-scroll">' +
+    '<header class="report-head">' +
+      '<button class="icon-btn" data-act="exit" aria-label="홈으로">' + icon('back', 18, 2.2) + '</button>' +
+      '<p class="t-caption" style="margin:0">임장 리포트</p></header>' +
+
+    '<section class="rating-card">' +
+      '<p class="t-body-sm" style="margin:0;color:var(--muted)">' + esc(a.regionName) + ' · ' + esc(a.stationName) + '</p>' +
+      '<div class="rating-value"><span class="t-rating">' + overall.toFixed(1) + '</span><span class="t-body" style="color:var(--muted);padding-bottom:12px">/ 5.0</span></div>' +
+      '<p class="t-caption" style="text-align:center;color:var(--muted);margin:4px 0 0">종합 거주 평점</p>' +
+      '<ul class="layer-list">' + ['SAFETY', 'EDUCATION', 'LIVING'].map((c) => {
+        const m = LAYER[c]; const s = layers[c];
+        return '<li><div class="layer-top"><span class="t-caption" style="color:' + m.color + '">' + m.label + '</span>' +
+          '<span class="t-body-sm num">' + (s > 0 ? s.toFixed(1) : '미평가') + '</span></div>' +
+          '<div class="bar" style="margin-top:6px;height:8px"><i style="width:' + (s / 5) * 100 + '%;background:' + m.color + '"></i></div></li>';
+      }).join('') + '</ul>' +
+    '</section>' +
+
+    '<div class="stats" style="margin:0 20px;border:1px solid var(--hairline-soft);border-radius:var(--r-md)">' +
+      '<div class="stat"><span class="k">' + icon('route', 14) + '이동 거리</span><span class="v">' + (session.totalDistanceMeters / 1000).toFixed(1) + 'km</span></div>' +
+      '<div class="stat"><span class="k">' + icon('clock', 14) + '총 소요</span><span class="v">' + session.totalMinutes + '분</span></div>' +
+      '<div class="stat"><span class="k">' + icon('pin', 14) + '완료 지점</span><span class="v">' + done + '/' + session.waypoints.length + '</span></div>' +
+    '</div>' +
+
+    '<div style="height:190px;margin:16px 20px 0;border:1px solid var(--hairline-soft);border-radius:var(--r-md);overflow:hidden;background:var(--surface-soft)">' +
+      mapSvg(session.waypoints, { activeIndex: session.waypoints.length - 1, showLabels: true }) + '</div>' +
+
+    '<h3 class="t-title-md" style="margin:32px 20px 0">현장 기록 타임라인</h3>' +
+    '<ol class="timeline">' + session.waypoints.map((w) => {
+      const m = LAYER[w.category];
+      const photo = session.photos[w.id];
+      return '<li><span class="tl-dot" style="background:' + m.color + '"></span>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span class="t-title-sm">' + w.order + '. ' + esc(w.name) + '</span>' +
+          '<span class="badge t-badge" style="color:' + m.color + ';background:' + m.soft + '">' + m.label + '</span></div>' +
+        (photo ? '<img src="' + photo + '" alt="' + esc(w.name) + ' 현장 사진">' : '') +
+        '<ul class="tl-answers">' + w.checkItems.map((item) =>
+          '<li><span class="q">' + esc(item.question) + '</span><span class="a' + (item.type === 'TEXT' ? ' memo' : '') + '">' + esc(answerText(item)) + '</span></li>'
+        ).join('') + '</ul></li>';
+    }).join('') + '</ol>' +
+
+    '<div class="export">' +
+      '<button class="cta" data-act="print">' + icon('download', 16, 2.2) + '<span style="margin-left:8px">PDF로 내보내기</span></button>' +
+      '<button class="cta secondary" data-act="copy-md">' + icon('copy', 16, 2.2) + '<span style="margin-left:8px">Notion으로 내보내기</span></button>' +
+    '</div>' +
+  '</div>' + (state.toast ? '<p class="toast">' + esc(state.toast) + '</p>' : '');
+}
+
+/* ---------- 렌더 ---------- */
+const CAPTIONS = {
+  home: '홈 & 스마트 탐색 — 4-세그먼트 검색바 + 테마별 추천',
+  live: '실시간 현장 임장 모드 — 경로 · 체크리스트 · 진행률 HUD',
+  report: '임장 완료 리포트 — 종합 평점 · 타임라인 · 내보내기',
+};
+function render() {
+  const active = document.activeElement;
+  const focusKey = active && active.dataset ? active.dataset.focus : null;
+  const caret = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
+  const scrolls = {};
+  app.querySelectorAll('.scroll, .check-items').forEach((el, i) => { scrolls[(el.id || 'i' + i)] = el.scrollTop; });
+
+  app.innerHTML = state.screen === 'home' ? homeHtml() : state.screen === 'live' ? liveHtml() : reportHtml();
+  caption.textContent = CAPTIONS[state.screen];
+  document.querySelectorAll('#steps .step').forEach((el) => el.setAttribute('aria-current', String(el.dataset.screen === state.screen)));
+
+  app.querySelectorAll('.scroll, .check-items').forEach((el, i) => {
+    const key = el.id || 'i' + i;
+    if (scrolls[key]) el.scrollTop = scrolls[key];
+  });
+  if (focusKey) {
+    const el = app.querySelector('[data-focus="' + focusKey + '"]');
+    if (el) { el.focus({ preventScroll: true }); if (caret !== null) { try { el.setSelectionRange(caret, caret); } catch (e) { /* range 미지원 */ } } }
+  }
+}
+let toastTimer;
+function toast(message) {
+  state.toast = message;
+  render();
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { state.toast = ''; render(); }, 2200);
+}
+
+/* ---------- 이벤트 ---------- */
+function mutateSession(routeId, fn) {
+  const { session } = currentSession(routeId);
+  fn(session);
+  saveSession(session);
+}
+
+app.addEventListener('click', (event) => {
+  const el = event.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  const id = el.dataset.id;
+  const v = el.dataset.v;
+
+  if (act === 'seg') { state.panelOpen = !state.panelOpen; render(); }
+  else if (act === 'deal') { state.profile.transactionType = v; render(); }
+  else if (act === 'open-brief') { state.briefingAreaId = id; render(); }
+  else if (act === 'close-brief') { state.briefingAreaId = null; render(); }
+  else if (act === 'start') {
+    state.routeId = id; state.screen = 'live'; state.briefingAreaId = null; state.sheetOpen = true; state.hint = ''; render();
+  }
+  else if (act === 'exit') { state.screen = 'home'; render(); }
+  else if (act === 'toggle-sheet') { state.sheetOpen = !state.sheetOpen; render(); }
+  else if (act === 'bool' || act === 'rate') {
+    state.hint = '';
+    mutateSession(state.routeId, (s) => {
+      s.waypoints.forEach((w) => w.checkItems.forEach((item) => {
+        if (item.id === id) item.value = act === 'bool' ? v === '1' : Number(v);
+      }));
+    });
+    render();
+  }
+  else if (act === 'photo') { photoInput.click(); }
+  else if (act === 'complete') { completeStep(); }
+  else if (act === 'print') { window.print(); }
+  else if (act === 'copy-md') {
+    const { a, session } = currentSession(state.routeId);
+    const md = reportMarkdown(a, session, calculateOverallRating(session.waypoints), layerScores(session.waypoints));
+    navigator.clipboard.writeText(md).then(() => toast('Notion용 마크다운을 복사했어요'), () => toast('복사에 실패했어요'));
+  }
+});
+
+app.addEventListener('input', (event) => {
+  const el = event.target;
+  const k = el.dataset.k;
+  if (!k) return;
+  if (k === 'memo') {
+    mutateSession(state.routeId, (s) => {
+      s.waypoints.forEach((w) => w.checkItems.forEach((item) => { if (item.id === el.dataset.id) item.value = el.value; }));
+    });
+    return; // 입력 중에는 다시 그리지 않는다 (커서 유지)
+  }
+  const n = Math.max(0, Number(el.value) || 0);
+  if (k === 'cash') state.profile.availableCash = n;
+  else if (k === 'income') state.profile.annualIncome = n;
+  else if (k === 'loan') state.profile.existingLoanAnnualRepayment = n;
+  else if (k === 'target') state.targetMinutes = n;
+  else if (k === 'region') state.regionId = el.value;
+  render();
+});
+
+function completeStep() {
+  if (!state.sheetOpen) { state.sheetOpen = true; render(); return; }
+  const { session } = currentSession(state.routeId);
+  let activeIndex = session.waypoints.findIndex((w) => !w.isCompleted);
+  if (activeIndex === -1) activeIndex = session.waypoints.length - 1;
+  const wp = session.waypoints[activeIndex];
+
+  if (!wp.checkItems.every(isAnswered)) { state.hint = '아직 응답하지 않은 항목이 있어요.'; render(); return; }
+  wp.isCompleted = true;
+  const finished = session.waypoints.every((w) => w.isCompleted);
+  if (finished) session.finishedAt = new Date().toISOString();
+  saveSession(session);
+  state.hint = '';
+  if (finished) state.screen = 'report';
+  render();
+}
+
+/* 현장 사진 — 긴 변 480px JPEG로 축소해 저장 */
+const photoInput = document.createElement('input');
+photoInput.type = 'file';
+photoInput.accept = 'image/*';
+photoInput.capture = 'environment';
+photoInput.id = 'photo-input';
+photoInput.style.display = 'none';
+photoInput.addEventListener('change', async () => {
+  const file = photoInput.files && photoInput.files[0];
+  photoInput.value = '';
+  if (!file) return;
+  try {
+    const dataUrl = await compressImageFile(file);
+    const { session } = currentSession(state.routeId);
+    let i = session.waypoints.findIndex((w) => !w.isCompleted);
+    if (i === -1) i = session.waypoints.length - 1;
+    session.photos[session.waypoints[i].id] = dataUrl;
+    saveSession(session);
+    render();
+  } catch { toast('사진을 저장하지 못했어요'); }
+});
+
+/* ---------- 왼쪽 레일 ---------- */
+const STEPS = [
+  { screen: 'home', name: '스마트 탐색', desc: '가용 예산을 넣으면 상한가를 역산해 테마별 후보 동네를 3개씩 추천합니다.' },
+  { screen: 'brief', name: '루트 브리핑', desc: '경로 미리보기, 총 거리·도보 시간, 구간별 급경사 브리핑을 확인합니다.' },
+  { screen: 'live', name: '실시간 현장 임장', desc: '경로를 따라가며 안전·교육·주거 체크리스트에 응답하고 사진을 남깁니다.' },
+  { screen: 'report', name: '완료 리포트', desc: '종합 거주 평점과 레이어별 득점, 사진·메모 타임라인을 정리합니다.' },
+];
+document.getElementById('steps').innerHTML = STEPS.map((s, i) =>
+  '<li><button class="step" data-screen="' + s.screen + '">' +
+    '<span class="idx">0' + (i + 1) + '</span>' +
+    '<span><span class="name">' + s.name + '</span><span class="desc">' + s.desc + '</span></span>' +
+  '</button></li>').join('');
+
+const defaultRouteId = () => state.routeId || recommendAreas(maxAffordable(), deal(), 'HOT_TRADING')[0].recommendedRouteId;
+
+document.getElementById('steps').addEventListener('click', (event) => {
+  const el = event.target.closest('.step');
+  if (!el) return;
+  const target = el.dataset.screen;
+  if (target === 'home') { state.screen = 'home'; state.briefingAreaId = null; }
+  else if (target === 'brief') {
+    state.screen = 'home';
+    state.briefingAreaId = areaByRoute(defaultRouteId()).id;
+  } else if (target === 'live') {
+    state.routeId = defaultRouteId(); state.screen = 'live'; state.sheetOpen = true;
+  } else {
+    state.routeId = defaultRouteId(); state.screen = 'report';
+  }
+  render();
+});
+
+document.querySelectorAll('[data-demo]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.demo === 'reset') {
+      clearSessions();
+      state.screen = 'home'; state.routeId = null; state.briefingAreaId = null; state.sheetOpen = true;
+      render();
+      return;
+    }
+    // 체크 9곳을 샘플 응답으로 채우고 리포트로 이동
+    const routeId = defaultRouteId();
+    const { session } = currentSession(routeId);
+    const SAMPLE = [4, 5, 3, 4, 5, 4, 3, 5, 4];
+    session.waypoints.forEach((w, wi) => {
+      w.checkItems.forEach((item, ii) => {
+        if (item.type === 'BOOLEAN') item.value = (wi + ii) % 4 !== 0;
+        else if (item.type === 'RATING') item.value = Math.max(1, Math.min(5, SAMPLE[(wi + ii) % SAMPLE.length]));
+        else item.value = w.order + '번 지점 — 현장 메모 예시입니다.';
+      });
+      w.isCompleted = true;
+    });
+    session.finishedAt = new Date().toISOString();
+    saveSession(session);
+    state.routeId = routeId; state.screen = 'report';
+    render();
+  });
+});
+
+document.body.appendChild(photoInput);
+render();
+</script>
+</body>
+</html>

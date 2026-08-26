@@ -6,6 +6,17 @@
 
 `WalkEstate_Blueprint.md`의 설계를 그대로 구현한 Next.js(App Router) + TypeScript + Tailwind CSS v4 프로젝트입니다.
 
+## 바로 보기 — 단일 HTML 데모
+
+빌드·설치 없이 `demo/index.html`을 브라우저로 열면 전체 흐름이 그대로 동작합니다.
+Next.js 앱과 같은 계산식(`finance.ts` / `scoring.ts`)과 같은 20개 시뮬레이션 지역을 한 파일에 옮겨 담았고,
+외부 의존성은 Google Fonts 하나뿐입니다(오프라인이면 시스템 폰트로 폴백).
+
+```bash
+open demo/index.html      # macOS
+xdg-open demo/index.html  # Linux
+```
+
 ## 실행
 
 ```bash
