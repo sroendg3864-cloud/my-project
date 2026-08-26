@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, Footprints, Mountain, Route as RouteIcon, X } from 'lucide-react';
 import RouteMap from '@/components/map/RouteMap';
+import { Basemap } from '@/data/basemap';
 import { LAYER_META, THEME_META } from '@/lib/layerTheme';
 import { CHECKPOINT_AVG_MINUTES } from '@/utils/scoring';
 import { RecommendedArea, SimulatedRoute } from '@/types';
@@ -20,15 +21,19 @@ interface Props {
 export const RouteBriefingSheet: React.FC<Props> = ({ area, initialRoute, targetMinutes, onClose }) => {
   const router = useRouter();
   const theme = THEME_META[area.theme];
-  const [route, setRoute] = useState(initialRoute);
+  const [resolved, setResolved] = useState<{ route: SimulatedRoute; basemap: Basemap | null }>({
+    route: initialRoute,
+    basemap: null,
+  });
+  const { route, basemap } = resolved;
 
-  // 카카오 키가 설정되어 있으면 실제 장소로 만든 루트로 교체한다 (없으면 그대로 시뮬레이션)
+  // 실제 장소·지도로 만든 루트로 교체한다 (실패하면 시뮬레이션 루트가 그대로 남는다)
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/routes/${initialRoute.routeId}`)
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: SimulatedRoute | null) => {
-        if (!cancelled && data?.routeId) setRoute(data);
+      .then((data: { route: SimulatedRoute; basemap: Basemap | null } | null) => {
+        if (!cancelled && data?.route?.routeId) setResolved(data);
       })
       .catch(() => { /* 실패해도 시뮬레이션 루트로 계속 진행 */ });
     return () => { cancelled = true; };
@@ -62,7 +67,9 @@ export const RouteBriefingSheet: React.FC<Props> = ({ area, initialRoute, target
             <p className="type-badge text-muted-soft mt-1.5">
               {route.source === 'KAKAO'
                 ? `카카오맵 실제 장소 · ${route.walkProvider === 'tmap-pedestrian' ? '보행자 경로 실측' : '직선거리 ×1.25 근사'}`
-                : '시뮬레이션 데이터 (카카오 키 미설정)'}
+                : route.source === 'OSM'
+                  ? 'OpenStreetMap 실제 장소 · 직선거리 ×1.25 근사'
+                  : '시뮬레이션 데이터'}
             </p>
           </div>
           <button
@@ -78,6 +85,7 @@ export const RouteBriefingSheet: React.FC<Props> = ({ area, initialRoute, target
         <div className="overflow-y-auto">
           <RouteMap
             route={route}
+            basemap={basemap}
             waypoints={route.waypoints}
             activeIndex={0}
             showLabels

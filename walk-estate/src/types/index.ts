@@ -49,7 +49,7 @@ export interface RecommendedArea {
 }
 
 /** 경로 데이터의 출처 — 실제 카카오 POI인지, 지역명 기반 시뮬레이션인지 */
-export type RouteSource = 'KAKAO' | 'SIMULATION';
+export type RouteSource = 'KAKAO' | 'OSM' | 'SIMULATION';
 
 /** 도보 거리 계산 방식 */
 export type WalkProvider = 'tmap-pedestrian' | 'straight-line' | 'simulation';

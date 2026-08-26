@@ -1,0 +1,162 @@
+{
+  "source": "위키백과 · 서울특별시의 행정 구역",
+  "sourceUrl": "https://ko.wikipedia.org/wiki/%EC%84%9C%EC%9A%B8%ED%8A%B9%EB%B3%84%EC%8B%9C%EC%9D%98%20%ED%96%89%EC%A0%95%20%EA%B5%AC%EC%97%AD",
+  "fetchedAt": "2026-08-26",
+  "unit": {
+    "population": "명",
+    "areaKm2": "km²",
+    "densityPerKm2": "명/km²"
+  },
+  "districts": {
+    "종로구": {
+      "households": 73554,
+      "population": 153531,
+      "areaKm2": 23.91,
+      "densityPerKm2": 6421
+    },
+    "중구": {
+      "households": 61075,
+      "population": 125941,
+      "areaKm2": 9.96,
+      "densityPerKm2": 12645
+    },
+    "용산구": {
+      "households": 108552,
+      "population": 229545,
+      "areaKm2": 21.87,
+      "densityPerKm2": 10496
+    },
+    "성동구": {
+      "households": 136000,
+      "population": 308519,
+      "areaKm2": 16.85,
+      "densityPerKm2": 18310
+    },
+    "광진구": {
+      "households": 161293,
+      "population": 355352,
+      "areaKm2": 17.06,
+      "densityPerKm2": 20830
+    },
+    "동대문구": {
+      "households": 161336,
+      "population": 349917,
+      "areaKm2": 14.2,
+      "densityPerKm2": 24642
+    },
+    "중랑구": {
+      "households": 179758,
+      "population": 405118,
+      "areaKm2": 18.5,
+      "densityPerKm2": 21898
+    },
+    "성북구": {
+      "households": 186542,
+      "population": 439292,
+      "areaKm2": 24.56,
+      "densityPerKm2": 17886
+    },
+    "강북구": {
+      "households": 143134,
+      "population": 321757,
+      "areaKm2": 23.61,
+      "densityPerKm2": 13628
+    },
+    "도봉구": {
+      "households": 137657,
+      "population": 341638,
+      "areaKm2": 20.7,
+      "densityPerKm2": 16504
+    },
+    "노원구": {
+      "households": 217528,
+      "population": 548371,
+      "areaKm2": 35.44,
+      "densityPerKm2": 15473
+    },
+    "은평구": {
+      "households": 203528,
+      "population": 484021,
+      "areaKm2": 29.69,
+      "densityPerKm2": 16302
+    },
+    "서대문구": {
+      "households": 137666,
+      "population": 310821,
+      "areaKm2": 17.6,
+      "densityPerKm2": 17660
+    },
+    "마포구": {
+      "households": 170955,
+      "population": 374579,
+      "areaKm2": 23.88,
+      "densityPerKm2": 15686
+    },
+    "양천구": {
+      "households": 176284,
+      "population": 466723,
+      "areaKm2": 17.4,
+      "densityPerKm2": 26823
+    },
+    "강서구": {
+      "households": 256746,
+      "population": 599501,
+      "areaKm2": 41.43,
+      "densityPerKm2": 14470
+    },
+    "구로구": {
+      "households": 171827,
+      "population": 406888,
+      "areaKm2": 20.12,
+      "densityPerKm2": 20223
+    },
+    "금천구": {
+      "households": 106464,
+      "population": 233145,
+      "areaKm2": 13,
+      "densityPerKm2": 17934
+    },
+    "영등포구": {
+      "households": 169466,
+      "population": 368733,
+      "areaKm2": 24.57,
+      "densityPerKm2": 15007
+    },
+    "동작구": {
+      "households": 174872,
+      "population": 395095,
+      "areaKm2": 16.35,
+      "densityPerKm2": 24165
+    },
+    "관악구": {
+      "households": 260090,
+      "population": 503900,
+      "areaKm2": 29.57,
+      "densityPerKm2": 17041
+    },
+    "서초구": {
+      "households": 174126,
+      "population": 439030,
+      "areaKm2": 47,
+      "densityPerKm2": 9341
+    },
+    "강남구": {
+      "households": 228853,
+      "population": 545809,
+      "areaKm2": 39.51,
+      "densityPerKm2": 13814
+    },
+    "송파구": {
+      "households": 268802,
+      "population": 667144,
+      "areaKm2": 33.88,
+      "densityPerKm2": 19691
+    },
+    "강동구": {
+      "households": 177579,
+      "population": 432168,
+      "areaKm2": 24.58,
+      "densityPerKm2": 17582
+    }
+  }
+}

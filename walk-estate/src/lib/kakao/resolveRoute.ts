@@ -8,7 +8,7 @@ import 'server-only';
 import { CATEGORY_GROUP, KakaoPlace, searchCategory, searchKeyword } from './local';
 import { isKakaoLocalEnabled } from './config';
 import { resolveWalkPath, haversineMeters, LatLng } from '@/lib/route/walk';
-import { buildSimulatedRoute, estimateTotalMinutes, estimateWalkMinutes } from '@/utils/scoring';
+import { estimateTotalMinutes, estimateWalkMinutes } from '@/utils/scoring';
 import { CheckItem, LayerCategory, RecommendedArea, SimulatedRoute, Waypoint } from '@/types';
 
 /** 카테고리별로 어떤 실제 시설을 체크포인트로 삼을지 */
@@ -51,7 +51,8 @@ const CHECK_TEMPLATES: Record<LayerCategory, Array<Omit<CheckItem, 'id'>>> = {
   ],
 };
 
-const SEARCH_RADIUS_M = 1200;
+/** 지도(basemap) 상자를 벗어나지 않도록 검색 반경을 제한한다 */
+const SEARCH_RADIUS_M = 750;
 
 /** 지역의 기준 좌표 — 대표 역을 먼저 찾고, 실패하면 동 이름으로 재시도 */
 async function findCenter(area: RecommendedArea): Promise<LatLng | null> {
@@ -153,13 +154,14 @@ function projectToCanvas(points: LatLng[]): Array<{ x: number; y: number }> {
 }
 
 /**
- * 카카오 실데이터로 루트를 만든다. 키가 없거나 검색 결과가 부족하면 시뮬레이션 루트로 폴백.
+ * 카카오 실데이터로 루트를 만든다.
+ * 키가 없거나 검색 결과가 부족하면 null — 호출한 쪽이 OSM/시뮬레이션으로 폴백한다.
  */
-export async function resolveRoute(area: RecommendedArea): Promise<SimulatedRoute> {
-  if (!isKakaoLocalEnabled()) return buildSimulatedRoute(area);
+export async function resolveKakaoRoute(area: RecommendedArea): Promise<SimulatedRoute | null> {
+  if (!isKakaoLocalEnabled()) return null;
 
   const center = await findCenter(area);
-  if (!center) return buildSimulatedRoute(area);
+  if (!center) return null;
 
   const byCategory = await Promise.all(
     (['SAFETY', 'EDUCATION', 'LIVING'] as LayerCategory[]).map(async (category) => ({
@@ -179,7 +181,7 @@ export async function resolveRoute(area: RecommendedArea): Promise<SimulatedRout
 
   // 레이어마다 최소 2곳은 나와야 리포트가 의미 있다 — 부족하면 시뮬레이션으로 폴백
   const enough = byCategory.every(({ places }) => places.length >= 2);
-  if (!enough || collected.length < 6) return buildSimulatedRoute(area);
+  if (!enough || collected.length < 6) return null;
 
   const ordered = twoOpt(center, orderByNearestNeighbour(center, collected));
   const canvas = projectToCanvas(ordered);

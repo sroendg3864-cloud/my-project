@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Clock, Copy, FileDown, Footprints, MapPin } from 'lucide-react';
 import RatingDisplayCard from '@/components/report/RatingDisplayCard';
 import RouteMap from '@/components/map/RouteMap';
+import { Basemap } from '@/data/basemap';
 import { LAYER_META } from '@/lib/layerTheme';
 import { useIsHydrated, useWalkSession } from '@/lib/walkSession';
 import { calculateLayerScores, calculateOverallRating } from '@/utils/scoring';
@@ -13,6 +14,7 @@ import { CheckItem, RecommendedArea, SimulatedRoute } from '@/types';
 interface Props {
   area: RecommendedArea;
   route: SimulatedRoute;
+  basemap: Basemap | null;
 }
 
 const answerText = (item: CheckItem): string => {
@@ -26,7 +28,7 @@ const answerText = (item: CheckItem): string => {
   return typeof item.value === 'string' && item.value.trim() ? item.value : '메모 없음';
 };
 
-export default function ReportClient({ area, route }: Props) {
+export default function ReportClient({ area, route, basemap }: Props) {
   const [copied, setCopied] = useState(false);
   const session = useWalkSession(route.routeId);
   const hydrated = useIsHydrated();
@@ -126,6 +128,7 @@ export default function ReportClient({ area, route }: Props) {
 
         <RouteMap
           route={route}
+          basemap={basemap}
           waypoints={session.waypoints}
           activeIndex={session.waypoints.length - 1}
           showLabels

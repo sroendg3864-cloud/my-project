@@ -7,6 +7,7 @@ import RouteBriefingSheet from '@/components/search/RouteBriefingSheet';
 import SearchBarPill, { SearchSegment } from '@/components/search/SearchBarPill';
 import { SIMULATED_AREAS, findAreaById } from '@/data/simulatedRoutes';
 import { THEME_META, THEME_ORDER } from '@/lib/layerTheme';
+import { hasMarketData, marketMonths, populationFetchedAt } from '@/data/metrics';
 import { calculateMaxAffordablePrice, formatKrwManwon } from '@/utils/finance';
 import { buildSimulatedRoute, calculateAreaScore, recommendAreas } from '@/utils/scoring';
 import { RecommendedArea, UserFinancialProfile } from '@/types';
@@ -211,11 +212,21 @@ export default function HomePage() {
           />
         ))}
 
-        <p className="type-body-sm text-muted-soft mt-10 flex items-start gap-2">
+        <div className="type-body-sm text-muted-soft mt-10 flex items-start gap-2">
           <Info size={15} strokeWidth={2} className="mt-0.5 shrink-0" />
-          지역·지표·경로는 데모용 시뮬레이션 데이터이며, 점수는 Score_Area = 0.4·거래량 + 0.3·수요밀도
-          + 0.3·예산적합도 로 계산한 100점 환산값입니다.
-        </p>
+          <div className="space-y-1">
+            <p>
+              점수는 Score_Area = 0.4·거래량 + 0.3·수요밀도 + 0.3·예산적합도 로 계산한 100점 환산값입니다.
+            </p>
+            <p>
+              인구밀도는 서울 자치구 실측치({populationFetchedAt} 기준), 지도·체크포인트는 OpenStreetMap 실제
+              장소입니다.{' '}
+              {hasMarketData
+                ? `시세·거래량은 국토교통부 아파트 실거래가 ${marketMonths.join('·')} 집계입니다.`
+                : '시세·거래량은 아직 데모값입니다 — 공공데이터포털 키를 넣고 build-market 스크립트를 실행하면 실거래가로 바뀝니다.'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {briefingArea && briefingRoute && (

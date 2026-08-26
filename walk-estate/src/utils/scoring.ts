@@ -1,4 +1,5 @@
 import { SIMULATED_AREAS, SIMULATION_METERS_PER_UNIT, generateSimulatedWaypoints } from '@/data/simulatedRoutes';
+import { getAreaMetrics } from '@/data/metrics';
 import {
   LayerCategory,
   RecommendationTheme,
@@ -25,22 +26,17 @@ export const calculateAreaScore = (
   allAreas: RecommendedArea[] = SIMULATED_AREAS,
   transactionType: 'BUY' | 'JEONSE' = 'BUY'
 ): number => {
-  const volumes = allAreas.map((a) => a.metrics.tradingVolumeLast3Months);
-  const densities = allAreas.map((a) => a.metrics.demandDensity);
+  // 실거래가·인구 실데이터가 있으면 그 값으로, 없으면 데모값으로 계산한다
+  const metricsOf = allAreas.map((a) => getAreaMetrics(a));
+  const volumes = metricsOf.map((m) => m.tradingVolume);
+  const densities = metricsOf.map((m) => m.demandDensity);
+  const metrics = getAreaMetrics(area);
 
-  const sTurnover = normalize(
-    area.metrics.tradingVolumeLast3Months,
-    Math.min(...volumes),
-    Math.max(...volumes)
-  );
-  const sDensity = normalize(
-    area.metrics.demandDensity,
-    Math.min(...densities),
-    Math.max(...densities)
-  );
+  const sTurnover = normalize(metrics.tradingVolume, Math.min(...volumes), Math.max(...volumes));
+  const sDensity = normalize(metrics.demandDensity, Math.min(...densities), Math.max(...densities));
 
   // S_BudgetFit = 1 - |targetPrice - userMaxAffordable| / userMaxAffordable
-  const { min, max } = area.priceRangeByType[transactionType];
+  const { min, max } = metrics.priceRange[transactionType];
   const targetPrice = (min + max) / 2;
   const sBudgetFit =
     userMaxAffordable > 0
@@ -171,7 +167,7 @@ export const recommendAreas = (
 ): RecommendedArea[] => {
 
   const fitsBudget = (area: RecommendedArea, tolerance: number) => {
-    const { min, max } = area.priceRangeByType[transactionType];
+    const { min, max } = getAreaMetrics(area).priceRange[transactionType];
     const widenedMin = min * (1 - tolerance);
     const widenedMax = max * (1 + tolerance);
     return userMaxAffordable >= widenedMin && userMaxAffordable <= widenedMax;

@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Footprints, X } from 'lucide-react';
 import CheckpointCard, { isCheckItemAnswered } from '@/components/live/CheckpointCard';
 import LiveBottomHUD from '@/components/live/LiveBottomHUD';
 import RouteMap from '@/components/map/RouteMap';
+import { Basemap } from '@/data/basemap';
 import { LAYER_META } from '@/lib/layerTheme';
 import { compressImageFile, saveWalkSession, useWalkSession } from '@/lib/walkSession';
 import { RecommendedArea, SimulatedRoute, WalkSession } from '@/types';
@@ -13,6 +14,7 @@ import { RecommendedArea, SimulatedRoute, WalkSession } from '@/types';
 interface Props {
   area: RecommendedArea;
   route: SimulatedRoute;
+  basemap: Basemap | null;
 }
 
 const createSession = (area: RecommendedArea, route: SimulatedRoute): WalkSession => ({
@@ -26,7 +28,7 @@ const createSession = (area: RecommendedArea, route: SimulatedRoute): WalkSessio
   totalMinutes: route.totalMinutes,
 });
 
-export default function LiveWalkClient({ area, route }: Props) {
+export default function LiveWalkClient({ area, route, basemap }: Props) {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(true);
   const [hint, setHint] = useState('');
@@ -116,6 +118,7 @@ export default function LiveWalkClient({ area, route }: Props) {
       {/* --- 전체 화면 시뮬레이션 캔버스 --- */}
       <RouteMap
         route={route}
+        basemap={basemap}
         waypoints={session.waypoints}
         activeIndex={activeIndex}
         showCurrentPosition

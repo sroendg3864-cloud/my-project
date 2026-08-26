@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { MapPin, TrendingUp, Users } from 'lucide-react';
+import { getAreaMetrics } from '@/data/metrics';
 import { THEME_META } from '@/lib/layerTheme';
 import { formatKrwManwon } from '@/utils/finance';
 import { RecommendedArea, TransactionType } from '@/types';
@@ -20,7 +21,8 @@ export const DiscoveryTownCard: React.FC<Props> = ({
   transactionType = 'BUY',
 }) => {
   const theme = THEME_META[area.theme];
-  const range = area.priceRangeByType[transactionType];
+  const metrics = getAreaMetrics(area);
+  const range = metrics.priceRange[transactionType];
 
   return (
     <button
@@ -57,14 +59,17 @@ export const DiscoveryTownCard: React.FC<Props> = ({
         {formatKrwManwon(range.max)}
       </p>
 
-      <div className="mt-3 flex items-center gap-3 type-body-sm text-muted-soft">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 type-body-sm text-muted-soft">
         <span className="flex items-center gap-1">
           <TrendingUp size={13} strokeWidth={2} />
-          3개월 {area.metrics.tradingVolumeLast3Months}건
+          거래 {metrics.tradingVolume}건
+          {metrics.provenance.volume === 'DEMO' && <span className="type-badge">데모</span>}
         </span>
         <span className="flex items-center gap-1">
           <Users size={13} strokeWidth={2} />
-          {area.metrics.topDemographic}
+          {metrics.densityPerKm2
+            ? `${metrics.district} ${metrics.densityPerKm2.toLocaleString('ko-KR')}명/km²`
+            : area.metrics.topDemographic}
         </span>
       </div>
 

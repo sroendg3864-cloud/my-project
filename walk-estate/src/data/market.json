@@ -1,0 +1,9 @@
+{
+  "source": "국토교통부 아파트 매매/전월세 실거래가 (공공데이터포털)",
+  "sourceUrl": "https://www.data.go.kr/data/15126469/openapi.do",
+  "note": "DATA_GO_KR_KEY를 넣고 `node scripts/build-market.mjs`를 실행하면 실거래가로 채워집니다. 비어 있으면 앱은 데모 시세로 폴백합니다.",
+  "months": [],
+  "unit": "만원",
+  "fetchedAt": null,
+  "areas": {}
+}
