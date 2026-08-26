@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * WalkEstate Design Tokens (walkestate-design-tokens v1.0.0)
+ * Airbnb foundation — clean white canvas, Rausch accent, soft rounding.
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-primary: #ff385c;
+  --color-primary-active: #e00b41;
+  --color-primary-disabled: #ffd1da;
+  --color-primary-soft: #fff0f2;
+
+  --color-ink: #222222;
+  --color-body: #3f3f3f;
+  --color-muted: #6a6a6a;
+  --color-muted-soft: #929292;
+
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #f2f2f2;
+  --color-on-primary: #ffffff;
+
+  /* Layer categories — 도보 체크포인트 전용 테마 */
+  --color-safety: #2a85ff;
+  --color-education: #7f56d9;
+  --color-living: #00a699;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --shadow-card-float:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  --shadow-bottom-bar: 0 -2px 10px rgba(0, 0, 0, 0.05);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    Pretendard, "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+}
+
+/* Typography scale — 토큰 이름을 그대로 유틸리티 클래스로 노출 */
+@layer components {
+  .type-rating-display {
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+  .type-display-lg {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.4px;
+  }
+  .type-title-md {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .type-title-sm {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+  .type-body-md {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+  .type-body-sm {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.43;
+  }
+  .type-caption {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.29;
+  }
+  .type-badge {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.18;
+  }
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 현장(야외) 사용 — 시인성 유지를 위해 라이트 캔버스로 고정 */
+:root {
+  color-scheme: light;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* 현재 위치 핀 펄스 & 바텀시트 슬라이드업 */
+@keyframes we-pulse {
+  0% { transform: scale(1); opacity: 0.45; }
+  70% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.we-pulse {
+  animation: we-pulse 1.9s ease-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes we-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.we-slide-up {
+  animation: we-slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .we-pulse, .we-slide-up { animation: none; }
+}
