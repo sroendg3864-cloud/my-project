@@ -14,10 +14,22 @@ import a5 from './a5.json';
 import b1 from './b1.json';
 import b2 from './b2.json';
 import b3 from './b3.json';
+import b4 from './b4.json';
+import b5 from './b5.json';
+import c1 from './c1.json';
+import c2 from './c2.json';
+import c3 from './c3.json';
+import c4 from './c4.json';
+import c5 from './c5.json';
+import d1 from './d1.json';
+import d2 from './d2.json';
+import d3 from './d3.json';
+import d4 from './d4.json';
+import d5 from './d5.json';
 
-const BASEMAPS: Record<string, unknown> = { a1, a2, a3, a4, a5, b1, b2, b3 };
+const BASEMAPS: Record<string, unknown> = { a1, a2, a3, a4, a5, b1, b2, b3, b4, b5, c1, c2, c3, c4, c5, d1, d2, d3, d4, d5 };
 
 export const getBasemap = (areaId: string): Basemap | null =>
   (BASEMAPS[areaId] as Basemap | undefined) ?? null;
 
-export const BASEMAP_AREA_IDS = ['a1', 'a2', 'a3', 'a4', 'a5', 'b1', 'b2', 'b3'];
+export const BASEMAP_AREA_IDS = ['a1', 'a2', 'a3', 'a4', 'a5', 'b1', 'b2', 'b3', 'b4', 'b5', 'c1', 'c2', 'c3', 'c4', 'c5', 'd1', 'd2', 'd3', 'd4', 'd5'];
