@@ -221,7 +221,7 @@ export default function HomePage() {
       {briefingArea && briefingRoute && (
         <RouteBriefingSheet
           area={briefingArea}
-          route={briefingRoute}
+          initialRoute={briefingRoute}
           targetMinutes={targetMinutes}
           onClose={() => setBriefingAreaId(null)}
         />

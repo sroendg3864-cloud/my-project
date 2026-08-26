@@ -48,11 +48,25 @@ export interface RecommendedArea {
   recommendedRouteId: string;
 }
 
-/** 시뮬레이션 루트 — waypoint 목록 + 2.4절 소요 시간 산출 결과 */
+/** 경로 데이터의 출처 — 실제 카카오 POI인지, 지역명 기반 시뮬레이션인지 */
+export type RouteSource = 'KAKAO' | 'SIMULATION';
+
+/** 도보 거리 계산 방식 */
+export type WalkProvider = 'tmap-pedestrian' | 'straight-line' | 'simulation';
+
+/** 루트 — waypoint 목록 + 2.4절 소요 시간 산출 결과 */
 export interface SimulatedRoute {
   routeId: string;
   areaId: string;
   waypoints: Waypoint[];
+  source: RouteSource;
+  walkProvider: WalkProvider;
+  /** 경사 정보를 신뢰할 수 있는 경로인지 (실데이터에는 고도 정보가 없어 false) */
+  hasSlopeData: boolean;
+  /** 지도 중심 (실좌표 모드에서만) */
+  center?: { lat: number; lng: number };
+  /** 구간별 실제 경로 좌표열 — 카카오 지도에 폴리라인으로 그린다 */
+  pathLegs?: Array<Array<{ lat: number; lng: number }>>;
   /** 구간 거리(m) 배열 — segmentDistances[i] = waypoint[i] → waypoint[i+1] */
   segmentDistances: number[];
   /** 구간별 경사 보정 계수 (1.0 = 평지) */

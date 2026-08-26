@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Copy, FileDown, Footprints, MapPin } from 'lucide-react';
 import RatingDisplayCard from '@/components/report/RatingDisplayCard';
-import SimulatedRouteCanvas from '@/components/map/SimulatedRouteCanvas';
+import RouteMap from '@/components/map/RouteMap';
 import { LAYER_META } from '@/lib/layerTheme';
 import { useIsHydrated, useWalkSession } from '@/lib/walkSession';
 import { calculateLayerScores, calculateOverallRating } from '@/utils/scoring';
@@ -124,7 +124,8 @@ export default function ReportClient({ area, route }: Props) {
           />
         </section>
 
-        <SimulatedRouteCanvas
+        <RouteMap
+          route={route}
           waypoints={session.waypoints}
           activeIndex={session.waypoints.length - 1}
           showLabels

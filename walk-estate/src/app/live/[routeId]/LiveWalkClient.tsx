@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp, Footprints, X } from 'lucide-react';
 import CheckpointCard, { isCheckItemAnswered } from '@/components/live/CheckpointCard';
 import LiveBottomHUD from '@/components/live/LiveBottomHUD';
-import SimulatedRouteCanvas from '@/components/map/SimulatedRouteCanvas';
+import RouteMap from '@/components/map/RouteMap';
 import { LAYER_META } from '@/lib/layerTheme';
 import { compressImageFile, saveWalkSession, useWalkSession } from '@/lib/walkSession';
 import { RecommendedArea, SimulatedRoute, WalkSession } from '@/types';
@@ -114,7 +114,8 @@ export default function LiveWalkClient({ area, route }: Props) {
   return (
     <main className="relative min-h-dvh bg-surface-soft">
       {/* --- 전체 화면 시뮬레이션 캔버스 --- */}
-      <SimulatedRouteCanvas
+      <RouteMap
+        route={route}
         waypoints={session.waypoints}
         activeIndex={activeIndex}
         showCurrentPosition

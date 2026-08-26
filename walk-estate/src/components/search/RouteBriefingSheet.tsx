@@ -1,24 +1,39 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, Footprints, Mountain, Route as RouteIcon, X } from 'lucide-react';
-import SimulatedRouteCanvas from '@/components/map/SimulatedRouteCanvas';
+import RouteMap from '@/components/map/RouteMap';
 import { LAYER_META, THEME_META } from '@/lib/layerTheme';
 import { CHECKPOINT_AVG_MINUTES } from '@/utils/scoring';
 import { RecommendedArea, SimulatedRoute } from '@/types';
 
 interface Props {
   area: RecommendedArea;
-  route: SimulatedRoute;
+  /** 먼저 보여줄 시뮬레이션 루트 — 카카오 실좌표 루트가 도착하면 교체된다 */
+  initialRoute: SimulatedRoute;
   targetMinutes: number;
   onClose: () => void;
 }
 
 /** 3.2 루트 브리핑 & 맵 뷰 — 카드를 누르면 열리는 경로 브리핑 시트 */
-export const RouteBriefingSheet: React.FC<Props> = ({ area, route, targetMinutes, onClose }) => {
+export const RouteBriefingSheet: React.FC<Props> = ({ area, initialRoute, targetMinutes, onClose }) => {
   const router = useRouter();
   const theme = THEME_META[area.theme];
+  const [route, setRoute] = useState(initialRoute);
+
+  // 카카오 키가 설정되어 있으면 실제 장소로 만든 루트로 교체한다 (없으면 그대로 시뮬레이션)
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/routes/${initialRoute.routeId}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: SimulatedRoute | null) => {
+        if (!cancelled && data?.routeId) setRoute(data);
+      })
+      .catch(() => { /* 실패해도 시뮬레이션 루트로 계속 진행 */ });
+    return () => { cancelled = true; };
+  }, [initialRoute.routeId]);
+
   const diff = route.totalMinutes - targetMinutes;
 
   return (
@@ -44,6 +59,11 @@ export const RouteBriefingSheet: React.FC<Props> = ({ area, route, targetMinutes
             <p className="type-body-sm text-muted mt-0.5">
               {area.stationName} 출발 · 체크포인트 {route.waypoints.length}곳
             </p>
+            <p className="type-badge text-muted-soft mt-1.5">
+              {route.source === 'KAKAO'
+                ? `카카오맵 실제 장소 · ${route.walkProvider === 'tmap-pedestrian' ? '보행자 경로 실측' : '직선거리 ×1.25 근사'}`
+                : '시뮬레이션 데이터 (카카오 키 미설정)'}
+            </p>
           </div>
           <button
             type="button"
@@ -56,7 +76,8 @@ export const RouteBriefingSheet: React.FC<Props> = ({ area, route, targetMinutes
         </header>
 
         <div className="overflow-y-auto">
-          <SimulatedRouteCanvas
+          <RouteMap
+            route={route}
             waypoints={route.waypoints}
             activeIndex={0}
             showLabels
@@ -95,7 +116,7 @@ export const RouteBriefingSheet: React.FC<Props> = ({ area, route, targetMinutes
           <ol className="px-5 py-4">
             {route.waypoints.map((waypoint, index) => {
               const meta = LAYER_META[waypoint.category];
-              const steep = route.segmentSlopeFactors[index] > 1;
+              const steep = route.hasSlopeData && route.segmentSlopeFactors[index] > 1;
               return (
                 <li key={waypoint.id} className="flex gap-3 py-2.5">
                   <span

@@ -192,6 +192,35 @@ h2 {
 }
 .ghost-btn:hover { border-color: var(--page-accent); }
 .ghost-btn:active { transform: scale(0.98); }
+.table-scroll { overflow-x: auto; }
+.src-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.src-table th {
+  text-align: left; font-family: var(--num); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--page-muted);
+  padding: 0 12px 8px 0; border-bottom: 1px solid var(--page-rule); white-space: nowrap;
+}
+.src-table td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--page-rule); vertical-align: top; line-height: 1.5; }
+.src-table td:first-child { font-weight: 700; white-space: nowrap; }
+.src-table td:last-child { padding-right: 0; }
+.pill-ok, .pill-warn, .pill-off {
+  display: inline-block; white-space: nowrap; border-radius: 999px; padding: 3px 10px;
+  font-family: var(--num); font-size: 11px; font-weight: 700;
+}
+.pill-ok { background: color-mix(in srgb, var(--living) 16%, transparent); color: var(--living); }
+.pill-warn { background: color-mix(in srgb, var(--page-accent) 14%, transparent); color: var(--page-accent); }
+.pill-off { background: color-mix(in srgb, var(--page-muted) 16%, transparent); color: var(--page-muted); }
+
+.key-row { display: flex; gap: 8px; }
+.key-input {
+  flex: 1; min-width: 0; height: 38px; padding: 0 12px;
+  border: 1px solid var(--page-rule); border-radius: 999px;
+  background: var(--page-panel); color: var(--page-fg); font-family: var(--num); font-size: 13px;
+}
+.key-input:focus { border-color: var(--page-accent); outline: none; }
+.key-status { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--page-muted); }
+.key-status[data-state="ready"] { color: var(--living); }
+.key-status[data-state="error"] { color: var(--page-accent); }
+.rail code { font-family: var(--num); font-size: 12.5px; background: color-mix(in srgb, var(--page-accent) 10%, transparent); padding: 1px 5px; border-radius: 4px; }
 
 /* ---- 폰 프레임 ---- */
 .stage { position: sticky; top: 40px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
@@ -479,7 +508,8 @@ textarea.memo:focus { border-color: var(--muted-soft); outline: none; }
       <p class="lede">
         가용 자산과 소득으로 실구매 상한가를 역산해 임장 후보지를 추천하고, 현장에서는 보행 전용 경로와
         스마트 체크리스트로 안전·교육·주거 환경을 검증합니다. 오른쪽 화면은 목업이 아니라 실제로 동작하는
-        프로토타입입니다 — Next.js 저장소와 같은 계산식·같은 20개 시뮬레이션 지역을 씁니다.
+        프로토타입입니다 — Next.js 저장소와 같은 계산식을 씁니다. 아래에 카카오맵 JavaScript 키를 넣으면
+        체크포인트가 그 동네의 <strong>실제 파출소·초등학교·마트·공원</strong>으로 바뀌고 지도도 카카오맵으로 그려집니다.
       </p>
     </header>
 
@@ -496,6 +526,22 @@ textarea.memo:focus { border-color: var(--muted-soft); outline: none; }
         <div class="formula"><dt>지역 추천 점수</dt><dd>Score_Area = 0.4·S_Turnover + 0.3·S_Density + 0.3·S_BudgetFit</dd></div>
         <div class="formula"><dt>예상 소요 시간</dt><dd>ceil(거리 / 80m·분) + 체크포인트 수 × 3분, 급경사 ×1.2</dd></div>
       </dl>
+    </section>
+
+    <section>
+      <h2>지금 무엇이 실제 데이터인가</h2>
+      <div class="table-scroll">
+        <table class="src-table">
+          <thead><tr><th>항목</th><th>출처</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>지도 · 좌표</td><td>카카오맵 JavaScript SDK</td><td><span class="pill-ok">실데이터</span></td></tr>
+            <tr><td>체크포인트 장소</td><td>카카오 장소 검색 (파출소 · 초등학교 · 학원 · 마트 · 공원)</td><td><span class="pill-ok">실데이터</span></td></tr>
+            <tr><td>도보 경로 · 거리</td><td>카카오 도보 길찾기는 <strong>제휴 파트너 전용</strong> — 직선거리 ×1.25 근사, Tmap 키를 넣으면 실측</td><td><span class="pill-warn">근사</span></td></tr>
+            <tr><td>경사 · 계단</td><td>카카오 Local API에 고도 정보 없음</td><td><span class="pill-warn">미지원</span></td></tr>
+            <tr><td>거래량 · 수요밀도</td><td>국토부 실거래가 · 주민등록 인구 연동 필요</td><td><span class="pill-off">데모값</span></td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section>
@@ -705,6 +751,7 @@ function buildRoute(a) {
   const walkMinutes = estimateWalkMinutes(adjusted);
   return {
     routeId: a.recommendedRouteId, areaId: a.id, waypoints, segmentDistances, segmentSlopeFactors,
+    source: 'SIMULATION', hasSlopeData: true,
     totalDistanceMeters, walkMinutes, totalMinutes: estimateTotalMinutes(walkMinutes, waypoints.length),
   };
 }
@@ -851,9 +898,12 @@ const deal = () => state.profile.transactionType;
 
 function currentSession(routeId) {
   const a = areaByRoute(routeId);
-  const route = buildRoute(a);
+  const route = getRoute(a);
   const saved = loadSession(routeId);
-  if (saved && saved.waypoints && saved.waypoints.length === route.waypoints.length) return { a, route, session: saved };
+  // 경로 출처가 바뀌면(시뮬레이션 → 카카오 실좌표) 체크포인트가 달라지므로 기록을 새로 시작한다
+  const sameRoute = saved && saved.waypoints && saved.waypoints.length === route.waypoints.length
+    && saved.waypoints[0].id === route.waypoints[0].id;
+  if (sameRoute) return { a, route, session: saved };
   return {
     a, route,
     session: {
@@ -984,7 +1034,7 @@ function homeHtml() {
 /* ---------- 루트 브리핑 시트 ---------- */
 function briefingHtml() {
   const a = areaById(state.briefingAreaId);
-  const route = buildRoute(a);
+  const route = getRoute(a);
   const t = THEME[a.theme];
   const diff = route.totalMinutes - state.targetMinutes;
   return '<div class="overlay"><button class="scrim" data-act="close-brief" aria-label="닫기"></button><div class="sheet">' +
@@ -992,10 +1042,11 @@ function briefingHtml() {
       '<span class="badge t-badge" style="color:' + t.color + ';background:' + t.soft + '">' + esc(a.badgeLabel) + '</span>' +
       '<p class="t-display" style="margin:8px 0 0">' + esc(a.regionName) + ' 도보 임장 루트</p>' +
       '<p class="t-body-sm" style="margin:2px 0 0;color:var(--muted)">' + esc(a.stationName) + ' 출발 · 체크포인트 ' + route.waypoints.length + '곳</p>' +
+      '<p class="t-badge" style="margin:6px 0 0;color:var(--muted-soft)">' + esc(routeSourceLabel(route)) + '</p>' +
     '</div><button class="icon-btn" data-act="close-brief" aria-label="닫기">' + icon('x', 18, 2.2) + '</button></div>' +
 
     '<div class="sheet-body">' +
-      '<div style="height:200px;border-bottom:1px solid var(--hairline-soft);background:var(--surface-soft)">' + mapSvg(route.waypoints, { showLabels: true }) + '</div>' +
+      '<div style="height:200px;border-bottom:1px solid var(--hairline-soft);background:var(--surface-soft)">' + mapView(route, route.waypoints, { showLabels: true, key: 'brief' }) + '</div>' +
       '<div class="stats">' +
         '<div class="stat"><span class="k">' + icon('route', 14) + '총 이동 거리</span><span class="v">' + (route.totalDistanceMeters / 1000).toFixed(1) + 'km</span></div>' +
         '<div class="stat"><span class="k">' + icon('clock', 14) + '도보 시간</span><span class="v">' + route.walkMinutes + '분</span></div>' +
@@ -1007,7 +1058,7 @@ function briefingHtml() {
                   : '<span style="color:var(--living)"> · 목표 ' + state.targetMinutes + '분 안에 완주 가능</span>') + '</p>' +
       '<ol class="wp-list">' + route.waypoints.map((w, i) => {
         const m = LAYER[w.category];
-        const steep = route.segmentSlopeFactors[i] > 1;
+        const steep = route.hasSlopeData !== false && route.segmentSlopeFactors[i] > 1;
         return '<li class="wp-row"><span class="wp-dot" style="background:' + m.color + '">' + w.order + '</span>' +
           '<span style="min-width:0"><span class="t-body-sm" style="display:block">' + esc(w.name) + '</span>' +
           '<span class="wp-meta"><span style="color:' + m.color + '">' + m.label + '</span>' +
@@ -1019,6 +1070,327 @@ function briefingHtml() {
     '<div class="sheet-foot"><button class="cta" data-act="start" data-id="' + route.routeId + '">현장 임장 시작하기</button></div>' +
   '</div></div>';
 }
+</script>
+<script>
+/* ==================================================================
+   카카오맵 연동 (선택)
+   JavaScript 키를 넣으면 지도·체크포인트를 실제 장소로 바꿔 그린다.
+
+   - 지도/장소 검색 모두 SDK의 services 라이브러리로 처리하므로 키는 하나만 필요하다.
+   - 카카오 개발자 콘솔 [플랫폼 > Web > 사이트 도메인]에 이 페이지의 주소를 등록해야 한다.
+     (file:// 로 열면 origin이 없어 차단되므로 http://localhost 로 서빙해야 한다.)
+   - 도보 실경로는 카카오 공개 API로 제공되지 않아(제휴 파트너 전용) 직선거리 × 1.25로 근사한다.
+   ================================================================== */
+const KAKAO_KEY_STORE = 'walkestate:kakao-js-key';
+const kakaoState = { key: '', maps: null, status: 'idle', message: '' };
+try { kakaoState.key = localStorage.getItem(KAKAO_KEY_STORE) || ''; } catch { /* noop */ }
+
+const routeCache = {};
+const routePending = {};
+const mapHosts = {};
+
+function routeSourceLabel(route) {
+  if (route.source !== 'KAKAO') {
+    return kakaoState.status === 'ready' ? '실제 장소를 불러오는 중…' : '시뮬레이션 데이터 (카카오 키 미연결)';
+  }
+  return '카카오맵 실제 장소 · 직선거리 ×1.25 근사';
+}
+
+/* ---------- SDK 로더 ---------- */
+let sdkPromise = null;
+function loadKakaoSdk(key) {
+  if (sdkPromise) return sdkPromise;
+  sdkPromise = new Promise((resolve, reject) => {
+    if (window.kakao && window.kakao.maps && window.kakao.maps.Map) { resolve(window.kakao.maps); return; }
+    const script = document.createElement('script');
+    script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(key) + '&autoload=false&libraries=services';
+    script.async = true;
+    script.onload = () => {
+      if (!window.kakao || !window.kakao.maps) { reject(new Error('SDK 초기화 실패')); return; }
+      window.kakao.maps.load(() => resolve(window.kakao.maps));
+    };
+    script.onerror = () => reject(new Error('SDK를 불러오지 못했습니다. 앱 키와 등록된 사이트 도메인을 확인해주세요.'));
+    document.head.appendChild(script);
+  });
+  return sdkPromise;
+}
+
+/* ---------- 장소 검색 (services 라이브러리) ---------- */
+function searchPlaces(method, query, center, radius, size) {
+  return new Promise((resolve) => {
+    const maps = kakaoState.maps;
+    if (!maps) { resolve([]); return; }
+    const places = new maps.services.Places();
+    const options = { size: size || 5 };
+    if (center) {
+      options.location = new maps.LatLng(center.lat, center.lng);
+      options.radius = radius || 1200;
+      options.sort = maps.services.SortBy.DISTANCE;
+    }
+    places[method](query, (data, status) => {
+      resolve(status === maps.services.Status.OK ? data : []);
+    }, options);
+  });
+}
+const keywordSearch = (query, center, radius, size) => searchPlaces('keywordSearch', query, center, radius, size);
+const categorySearch = (code, center, radius, size) => searchPlaces('categorySearch', code, center, radius, size);
+
+/* ---------- 레이어별로 어떤 실제 시설을 체크포인트로 삼을지 ---------- */
+const LAYER_SOURCES = {
+  SAFETY: [['keyword', '지구대'], ['keyword', '파출소'], ['keyword', '치안센터']],
+  EDUCATION: [['keyword', '초등학교'], ['category', 'AC5'], ['keyword', '도서관']],
+  LIVING: [['category', 'SW8'], ['category', 'MT1'], ['keyword', '공원']],
+};
+
+const EARTH_R = 6371000;
+function haversine(a, b) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+const DETOUR_FACTOR = 1.25;
+
+function orderByNearestNeighbour(start, points) {
+  const rest = points.slice(); const out = []; let cursor = start;
+  while (rest.length) {
+    let bi = 0, bd = Infinity;
+    rest.forEach((p, i) => { const d = haversine(cursor, p); if (d < bd) { bd = d; bi = i; } });
+    const [next] = rest.splice(bi, 1); out.push(next); cursor = next;
+  }
+  return out;
+}
+/** 2-opt — 최근접 이웃이 만든 교차 구간을 뒤집어 총 거리를 줄인다 */
+function twoOpt(start, points) {
+  const len = (list) => list.reduce((sum, p, i) => sum + haversine(i === 0 ? start : list[i - 1], p), 0);
+  let best = points.slice(), bestLen = len(best), improved = true, guard = 0;
+  while (improved && guard < 40) {
+    improved = false; guard += 1;
+    for (let i = 0; i < best.length - 1; i += 1) {
+      for (let j = i + 1; j < best.length; j += 1) {
+        const cand = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1));
+        const l = len(cand);
+        if (l < bestLen - 1) { best = cand; bestLen = l; improved = true; }
+      }
+    }
+  }
+  return best;
+}
+function projectToCanvas(points) {
+  const lats = points.map((p) => p.lat), lngs = points.map((p) => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const spanLat = maxLat - minLat || 1e-6, spanLng = maxLng - minLng || 1e-6;
+  return points.map((p) => ({
+    x: Number((8 + ((p.lng - minLng) / spanLng) * 84).toFixed(2)),
+    y: Number((92 - ((p.lat - minLat) / spanLat) * 84).toFixed(2)),
+  }));
+}
+
+/* ---------- 실제 장소로 루트 만들기 ---------- */
+async function resolveKakaoRoute(a) {
+  let center = null;
+  for (const query of [a.stationName, a.regionName + ' ' + a.stationName, a.regionName]) {
+    const [hit] = await keywordSearch(query, null, null, 1);
+    if (hit) { center = { lat: Number(hit.y), lng: Number(hit.x) }; break; }
+  }
+  if (!center) return null;
+
+  const collected = [];
+  for (const category of ['SAFETY', 'EDUCATION', 'LIVING']) {
+    const picked = []; const seen = new Set();
+    for (const [kind, value] of LAYER_SOURCES[category]) {
+      if (picked.length >= 3) break;
+      const found = kind === 'keyword'
+        ? await keywordSearch(value, center, 1200, 5)
+        : await categorySearch(value, center, 1200, 5);
+      for (const place of found) {
+        if (picked.length >= 3 || seen.has(place.id)) continue;
+        seen.add(place.id); picked.push(place);
+      }
+    }
+    if (picked.length < 2) return null; // 레이어가 비면 리포트가 의미 없어진다
+    picked.forEach((place) => collected.push({
+      category, place, lat: Number(place.y), lng: Number(place.x),
+    }));
+  }
+  if (collected.length < 6) return null;
+
+  const ordered = twoOpt(center, orderByNearestNeighbour(center, collected));
+  const canvas = projectToCanvas(ordered);
+  const waypoints = ordered.map((item, index) => {
+    const id = a.recommendedRouteId + '-kakao-' + item.place.id;
+    return {
+      id, order: index + 1, category: item.category, name: item.place.place_name,
+      x: canvas[index].x, y: canvas[index].y, lat: item.lat, lng: item.lng,
+      checkItems: CHECKS[item.category].map((c, i) => ({ id: id + '-c' + (i + 1), question: c.question, type: c.type })),
+      isCompleted: false,
+    };
+  });
+
+  const segmentDistances = waypoints.slice(0, -1).map((w, i) =>
+    Math.round(haversine(w, waypoints[i + 1]) * DETOUR_FACTOR));
+  const totalDistanceMeters = segmentDistances.reduce((s, d) => s + d, 0);
+  const walkMinutes = estimateWalkMinutes(totalDistanceMeters);
+
+  return {
+    routeId: a.recommendedRouteId, areaId: a.id, waypoints,
+    source: 'KAKAO', walkProvider: 'straight-line', hasSlopeData: false, center,
+    pathLegs: waypoints.slice(0, -1).map((w, i) => [{ lat: w.lat, lng: w.lng }, { lat: waypoints[i + 1].lat, lng: waypoints[i + 1].lng }]),
+    segmentDistances, segmentSlopeFactors: segmentDistances.map(() => 1),
+    totalDistanceMeters, walkMinutes, totalMinutes: estimateTotalMinutes(walkMinutes, waypoints.length),
+  };
+}
+
+/** 캐시된 실좌표 루트가 있으면 그걸, 없으면 시뮬레이션 루트를 주고 뒤에서 채워 넣는다 */
+function getRoute(a) {
+  const id = a.recommendedRouteId;
+  if (routeCache[id]) return routeCache[id];
+  if (kakaoState.status === 'ready' && !routePending[id]) {
+    routePending[id] = true;
+    resolveKakaoRoute(a)
+      .then((route) => { if (route) { routeCache[id] = route; if (typeof render === 'function') render(); } })
+      .catch(() => { /* 실패하면 시뮬레이션 루트를 계속 쓴다 */ })
+      .finally(() => { routePending[id] = false; });
+  }
+  return buildRoute(a);
+}
+
+/* ---------- 지도 렌더 ---------- */
+function mapView(route, waypoints, opts) {
+  const usable = kakaoState.status === 'ready' && route && route.source === 'KAKAO'
+    && waypoints.every((w) => typeof w.lat === 'number');
+  if (!usable) return mapSvg(waypoints, opts);
+  return '<div data-kakao-map="' + opts.key + '" data-route="' + route.routeId +
+    '" data-active="' + (opts.activeIndex || 0) + '" data-here="' + (opts.showCurrent ? '1' : '') +
+    '" style="width:100%;height:100%"></div>';
+}
+
+function markerEl(waypoint, active) {
+  const meta = LAYER[waypoint.category];
+  const size = active ? 34 : 28;
+  const el = document.createElement('div');
+  el.style.cssText = 'width:' + size + 'px;height:' + size + 'px;border-radius:999px;display:flex;align-items:center;' +
+    'justify-content:center;font-weight:700;font-size:' + (active ? 14 : 12) + 'px;background:' +
+    (waypoint.isCompleted ? meta.color : '#fff') + ';color:' + (waypoint.isCompleted ? '#fff' : meta.color) +
+    ';border:2px solid ' + meta.color + ';box-shadow:0 2px 6px rgba(0,0,0,.2)';
+  el.textContent = String(waypoint.order);
+  return el;
+}
+const HERE_HTML = '<div style="position:relative;width:18px;height:18px">' +
+  '<span class="we-pulse" style="position:absolute;inset:0;border-radius:999px;background:#ff385c;opacity:.4"></span>' +
+  '<span style="position:absolute;inset:4px;border-radius:999px;background:#ff385c;border:2px solid #fff"></span></div>';
+
+function mountKakaoMaps() {
+  const maps = kakaoState.maps;
+  if (!maps) return;
+  app.querySelectorAll('[data-kakao-map]').forEach((placeholder) => {
+    const key = placeholder.dataset.kakaoMap;
+    const route = routeCache[placeholder.dataset.route];
+    if (!route) return;
+    const activeIndex = Number(placeholder.dataset.active || 0);
+    const showHere = placeholder.dataset.here === '1';
+
+    let host = mapHosts[key];
+    if (!host) {
+      const el = document.createElement('div');
+      el.style.cssText = 'width:100%;height:100%';
+      host = mapHosts[key] = { el, map: null, overlays: [] };
+    }
+    placeholder.appendChild(host.el);
+
+    if (!host.map) {
+      host.map = new maps.Map(host.el, { center: new maps.LatLng(route.center.lat, route.center.lng), level: 4 });
+    } else if (host.map.relayout) {
+      host.map.relayout();
+    }
+
+    host.overlays.forEach((o) => o.setMap(null));
+    host.overlays = [];
+
+    (route.pathLegs || []).forEach((leg, index) => {
+      const line = new maps.Polyline({
+        path: leg.map((p) => new maps.LatLng(p.lat, p.lng)),
+        strokeWeight: 5,
+        strokeColor: index < activeIndex ? '#ff385c' : '#ffd1da',
+        strokeOpacity: 0.95,
+        strokeStyle: index < activeIndex ? 'solid' : 'shortdash',
+      });
+      line.setMap(host.map); host.overlays.push(line);
+    });
+
+    route.waypoints.forEach((waypoint, index) => {
+      const overlay = new maps.CustomOverlay({
+        position: new maps.LatLng(waypoint.lat, waypoint.lng),
+        content: markerEl(waypoint, index === activeIndex), yAnchor: 0.5, zIndex: index === activeIndex ? 5 : 3,
+      });
+      overlay.setMap(host.map); host.overlays.push(overlay);
+    });
+
+    const active = route.waypoints[Math.min(activeIndex, route.waypoints.length - 1)];
+    if (showHere && active) {
+      const here = new maps.CustomOverlay({
+        position: new maps.LatLng(active.lat, active.lng), content: HERE_HTML, yAnchor: 0.5, zIndex: 6,
+      });
+      here.setMap(host.map); host.overlays.push(here);
+      host.map.panTo(new maps.LatLng(active.lat, active.lng));
+    } else {
+      const bounds = new maps.LatLngBounds();
+      route.waypoints.forEach((w) => bounds.extend(new maps.LatLng(w.lat, w.lng)));
+      host.map.setBounds(bounds, 36, 24, 36, 24);
+    }
+  });
+}
+
+/* ---------- 왼쪽 레일: 키 입력 UI ---------- */
+const kakaoSection = document.createElement('section');
+kakaoSection.innerHTML =
+  '<h2>카카오맵 연결 <span style="font-weight:500;text-transform:none;letter-spacing:0">선택</span></h2>' +
+  '<div class="key-row">' +
+    '<input id="kakao-key" class="key-input" type="password" autocomplete="off" spellcheck="false" placeholder="JavaScript 앱 키 붙여넣기" />' +
+    '<button class="ghost-btn" id="kakao-connect">연결</button>' +
+  '</div>' +
+  '<p class="key-status" id="kakao-status"></p>' +
+  '<p class="note" style="margin-top:14px">' +
+    '키를 넣으면 체크포인트가 <strong>실제 파출소·초등학교·마트·공원</strong>으로 바뀌고 지도도 카카오맵으로 그려집니다. ' +
+    '키는 이 브라우저에만 저장됩니다.<br><br>' +
+    '카카오 개발자 콘솔 <strong>[플랫폼 &gt; Web &gt; 사이트 도메인]</strong>에 이 페이지 주소를 등록해야 동작합니다. ' +
+    '<code>file://</code>로 열거나 외부 스크립트가 차단된 환경에서는 시뮬레이션 캔버스로 남습니다.<br><br>' +
+    '도보 실경로(턴바이턴)는 카카오 공개 API로 제공되지 않아(제휴 파트너 전용) 여기서는 직선거리 ×1.25로 근사합니다.' +
+  '</p>';
+document.querySelector('.rail').appendChild(kakaoSection);
+
+const keyInput = document.getElementById('kakao-key');
+const keyStatus = document.getElementById('kakao-status');
+keyInput.value = kakaoState.key;
+
+function setStatus(status, message) {
+  kakaoState.status = status;
+  kakaoState.message = message;
+  keyStatus.textContent = message;
+  keyStatus.dataset.state = status;
+}
+
+function connectKakao(key) {
+  if (!key) { setStatus('idle', '키를 넣으면 실제 장소·지도로 바뀝니다.'); return; }
+  setStatus('loading', '카카오맵 SDK를 불러오는 중…');
+  loadKakaoSdk(key)
+    .then((maps) => {
+      kakaoState.maps = maps;
+      setStatus('ready', '연결됨 — 추천 동네를 눌러 실제 장소 루트를 확인하세요.');
+      try { localStorage.setItem(KAKAO_KEY_STORE, key); } catch { /* noop */ }
+      if (typeof render === 'function') render();
+    })
+    .catch((error) => {
+      sdkPromise = null;
+      setStatus('error', error.message + ' (시뮬레이션 캔버스로 계속 동작합니다)');
+    });
+}
+
+document.getElementById('kakao-connect').addEventListener('click', () => connectKakao(keyInput.value.trim()));
+keyInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') connectKakao(keyInput.value.trim()); });
+setStatus('idle', kakaoState.key ? '저장된 키로 연결합니다…' : '키를 넣으면 실제 장소·지도로 바뀝니다.');
+if (kakaoState.key) connectKakao(kakaoState.key);
 </script>
 <script>
 /* ---------- 실시간 현장 임장 모드 ---------- */
@@ -1056,7 +1428,7 @@ function liveHtml() {
     return '<li><p class="t-body-sm" style="margin:0;color:var(--body)">' + esc(item.question) + '</p>' + control + '</li>';
   }).join('');
 
-  return '<div class="map-layer">' + mapSvg(session.waypoints, { activeIndex, showCurrent: true, align: 'top' }) + '</div>' +
+  return '<div class="map-layer">' + mapView(route, session.waypoints, { activeIndex, showCurrent: true, align: 'top', key: 'live' }) + '</div>' +
 
     '<header class="live-head">' +
       '<button class="icon-btn" data-act="exit" aria-label="임장 중단하고 나가기">' + icon('x', 18, 2.2) + '</button>' +
@@ -1159,7 +1531,7 @@ function reportHtml() {
     '</div>' +
 
     '<div style="height:190px;margin:16px 20px 0;border:1px solid var(--hairline-soft);border-radius:var(--r-md);overflow:hidden;background:var(--surface-soft)">' +
-      mapSvg(session.waypoints, { activeIndex: session.waypoints.length - 1, showLabels: true }) + '</div>' +
+      mapView(currentSession(state.routeId).route, session.waypoints, { activeIndex: session.waypoints.length - 1, showLabels: true, key: 'report' }) + '</div>' +
 
     '<h3 class="t-title-md" style="margin:32px 20px 0">현장 기록 타임라인</h3>' +
     '<ol class="timeline">' + session.waypoints.map((w) => {
@@ -1196,6 +1568,7 @@ function render() {
   app.querySelectorAll('.scroll, .check-items').forEach((el, i) => { scrolls[(el.id || 'i' + i)] = el.scrollTop; });
 
   app.innerHTML = state.screen === 'home' ? homeHtml() : state.screen === 'live' ? liveHtml() : reportHtml();
+  mountKakaoMaps();
   caption.textContent = CAPTIONS[state.screen];
   document.querySelectorAll('#steps .step').forEach((el) => el.setAttribute('aria-current', String(el.dataset.screen === state.screen)));
 
